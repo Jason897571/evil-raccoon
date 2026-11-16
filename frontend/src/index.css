@@ -277,8 +277,7 @@ img { display: block; max-width: 100%; }
 /* ---------- 账户 / 订单 ---------- */
 .narrow { max-width: 880px; padding-top: 56px; padding-bottom: 112px; }
 .auth-wrap { max-width: 480px; padding-top: 72px; padding-bottom: 120px; }
-.auth-tabs { margin-bottom: 28px; }
-.auth-tabs .tab { flex: 1; font-size: 20px; }
+.mode-switch { margin: 20px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
 .form-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .form .text-link, .settings-card .text-link { font-size: 13px; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
 .form .text-link:hover, .settings-card .text-link:hover { color: var(--accent); }

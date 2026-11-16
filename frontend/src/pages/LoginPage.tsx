@@ -18,7 +18,7 @@ export function LoginPage() {
   const { ready, user, refresh } = useAuth()
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState<Mode>('code')
+  const [mode, setMode] = useState<Mode>('password')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
@@ -87,15 +87,6 @@ export function LoginPage() {
           还没有账号？<Link className="inline-link" to={registerHref}>注册一个</Link>
         </p>
 
-        <div className="tabs auth-tabs" role="tablist" aria-label="登录方式">
-          <button type="button" role="tab" className="tab" aria-selected={mode === 'code'} onClick={() => switchMode('code')}>
-            验证码登录
-          </button>
-          <button type="button" role="tab" className="tab" aria-selected={mode === 'password'} onClick={() => switchMode('password')}>
-            密码登录
-          </button>
-        </div>
-
         {mode === 'password' ? (
           <form className="form" onSubmit={submit('/api/auth/password-login', { email: email.trim(), password })}>
             {emailInput}
@@ -139,6 +130,15 @@ export function LoginPage() {
             </button>
           </form>
         )}
+
+        {/* 密码登录为主；验证码登录收成一行小字，点一下切换 */}
+        <p className="mode-switch">
+          {mode === 'password' ? (
+            <>没设过密码、或者忘了？<button type="button" className="text-btn" onClick={() => switchMode('code')}>用邮箱验证码登录</button></>
+          ) : (
+            <button type="button" className="text-btn" onClick={() => switchMode('password')}>用密码登录</button>
+          )}
+        </p>
       </main>
     </>
   )
