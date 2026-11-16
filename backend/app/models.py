@@ -59,6 +59,20 @@ class Skill(Base):
     pack: Mapped[Pack] = relationship(back_populates="skills")
 
 
+class HeroSlot(Base):
+    """首页首屏的 12 格动图，后台可改。position 0-11：左 2×2、中间一排 4 格、右 2×2。"""
+
+    __tablename__ = "hero_slots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, unique=True)
+    label: Mapped[str] = mapped_column(String(16))  # 格子下面的字，一般是元素名
+    skill_id: Mapped[int | None] = mapped_column(ForeignKey("skills.id", ondelete="SET NULL"))
+    gif_url: Mapped[str] = mapped_column(String(255))
+
+    skill: Mapped["Skill | None"] = relationship()
+
+
 class User(Base):
     __tablename__ = "users"
 

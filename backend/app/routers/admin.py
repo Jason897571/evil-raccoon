@@ -1,6 +1,6 @@
 """管理接口。
 
-- 特效包（含技能、上传图片）、充电档位：登录的管理员或 API token 都能调（Authorization: Bearer <token>）。
+- 特效包（含技能、上传图片）、首屏动图、充电档位：登录的管理员或 API token 都能调（Authorization: Bearer <token>）。
 - 用户资料：只有登录的管理员能看，token 不行。
 - token 本身的创建 / 吊销：只能由登录的管理员在后台操作，token 不能再生 token。
 """
@@ -17,11 +17,12 @@ from app.config import settings
 from app.db import get_session
 from app.deps import AdminActor, admin_actor, admin_user
 from app.models import (
-    ApiToken, Order, OrderItem, Pack, Skill, SupportPayment, SupportTier, User, UserSession, utcnow,
+    ApiToken, HeroSlot, Order, OrderItem, Pack, Skill, SupportPayment, SupportTier, User, UserSession, utcnow,
 )
 from app.routers.orders import order_out
 from app.schemas import (
-    AdminOwnedPack, AdminPack, AdminSkill, AdminUserDetail, AdminUserRow, PackCreate, PackPatch, SkillCreate,
+    AdminHeroSlot, AdminOwnedPack, AdminPack, AdminSkill, AdminUserDetail, AdminUserRow, HeroUpdate, PackCreate,
+    PackPatch, SkillCreate,
     SkillPatch, SupportPaymentOut, TierIn, TierOut, TierPatch, TokenCreate, TokenCreated, TokenOut, UploadOut,
 )
 from app.security import digest
@@ -151,6 +152,49 @@ def delete_skill(
     pack = get_pack(db, slug)
     pack.skills.remove(get_skill(pack, code))
     db.commit()
+
+
+# ---------- 首屏 12 格 ----------
+
+def hero_slots(db: Session) -> list[AdminHeroSlot]:
+    slots = db.scalars(
+        select(HeroSlot).options(selectinload(HeroSlot.skill).selectinload(Skill.pack)).order_by(HeroSlot.position)
+    )
+    return [
+        AdminHeroSlot(
+            position=s.position, label=s.label, gif_url=s.gif_url,
+            skill_code=s.skill.code if s.skill else None, skill_name=s.skill.name if s.skill else None,
+            pack_slug=s.skill.pack.slug if s.skill else None, pack_name=s.skill.pack.name if s.skill else None,
+            pack_published=s.skill.pack.is_published if s.skill else None,
+        )
+        for s in slots
+    ]
+
+
+@router.get("/hero", response_model=list[AdminHeroSlot])
+def read_hero(_: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> list[AdminHeroSlot]:
+    return hero_slots(db)
+
+
+@router.put("/hero", response_model=list[AdminHeroSlot])
+def update_hero(body: HeroUpdate, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> list[AdminHeroSlot]:
+    """整体替换首屏 12 格。每格选一个技能（动图默认用它的预览 GIF），或者只填标签 + 自己上传的 GIF。"""
+    codes = {s.skill_code for s in body.slots if s.skill_code}
+    skills = {s.code: s for s in db.scalars(select(Skill).where(Skill.code.in_(codes)))} if codes else {}
+    if missing := sorted(codes - skills.keys()):
+        raise HTTPException(status_code=422, detail=f"找不到这些技能：{'、'.join(missing)}")
+    for i, s in enumerate(body.slots, start=1):
+        skill = skills.get(s.skill_code) if s.skill_code else None
+        if not s.gif_url.strip() and not (skill and skill.preview_gif_url):
+            raise HTTPException(status_code=422, detail=f"第 {i} 格没有动图：选一个有预览图的技能，或者上传一张 GIF")
+    db.execute(delete(HeroSlot))
+    db.flush()
+    for position, s in enumerate(body.slots):
+        skill = skills.get(s.skill_code) if s.skill_code else None
+        gif = s.gif_url.strip() or skill.preview_gif_url  # 上面已保证两者至少有一个
+        db.add(HeroSlot(position=position, label=s.label.strip(), skill_id=skill.id if skill else None, gif_url=gif))
+    db.commit()
+    return hero_slots(db)
 
 
 # ---------- 上传图片 ----------

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.db import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402
-    ApiToken, LoginCode, Order, OrderItem, Pack, Skill, SupportPayment, SupportTier, User, UserSession,
+    ApiToken, HeroSlot, LoginCode, Order, OrderItem, Pack, Skill, SupportPayment, SupportTier, User, UserSession,
 )
 
 
@@ -41,7 +41,7 @@ def schema():
 @pytest.fixture(autouse=True)
 def seed():
     with Session(engine) as db:
-        for model in (SupportPayment, ApiToken, SupportTier, OrderItem, Order, UserSession, LoginCode, User, Skill, Pack):
+        for model in (HeroSlot, SupportPayment, ApiToken, SupportTier, OrderItem, Order, UserSession, LoginCode, User, Skill, Pack):
             db.execute(delete(model))
         for i, (slug, name, price) in enumerate([("time", "时间", 2990), ("fire", "火焰", 1990), ("wind", "风", 990)]):
             pack = Pack(

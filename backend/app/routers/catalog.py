@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.catalog import ELEMENT_ORDER, HERO_TILES
+from app.catalog import ELEMENT_ORDER
 from app.db import get_session
-from app.models import Pack, Skill
+from app.models import HeroSlot, Pack, Skill
 from app.schemas import HeroTile, HomeOut, PackDetail, PackSummary, Stats
 
 router = APIRouter(prefix="/api", tags=["catalog"])
@@ -31,10 +31,14 @@ def health() -> dict[str, str]:
 @router.get("/home", response_model=HomeOut)
 def home(db: Session = Depends(get_session)) -> HomeOut:
     packs = list_packs(db)
-    names = dict(db.execute(select(Skill.code, Skill.name).where(Skill.code.in_([c for _, c in HERO_TILES]))).all())
+    slots = db.scalars(select(HeroSlot).options(selectinload(HeroSlot.skill)).order_by(HeroSlot.position))
     hero = [
-        HeroTile(label=label, skill_name=names.get(code, label), gif_url=f"/media/hero/{code}.gif")
-        for label, code in HERO_TILES
+        HeroTile(
+            label=slot.label,
+            skill_name=slot.skill.name if slot.skill else slot.label,
+            gif_url=slot.gif_url or (slot.skill.preview_gif_url if slot.skill else ""),
+        )
+        for slot in slots
     ]
     present = {p.element for p in packs}
     elements = [e for e in ELEMENT_ORDER if e in present] + sorted(present - set(ELEMENT_ORDER))

@@ -32,7 +32,8 @@ PACKS: dict[str, tuple[str, str, str]] = {
 ELEMENT_ORDER = ["火", "冰", "雷", "风", "土", "水", "圣光", "暗影", "空间", "自然",
                  "剑", "毒", "机械", "星辰", "时间", "水晶", "血", "召唤"]
 
-# 首屏 12 格，和爱发电头图一致：左 2×2、中间 4 格、右 2×2
+# 默认首屏 12 格（左 2×2、中间 4 格、右 2×2）。上线后首屏以后台「首屏」里的设置为准（hero_slots 表），
+# 这份只给导入脚本导出无水印 GIF 到 media/hero/ 用；迁移里另存了一份同样的初始值。
 HERO_TILES: list[tuple[str, str]] = [
     ("雷", "lightning_02_thunderstrike"),
     ("圣光", "holy_02_judgment"),

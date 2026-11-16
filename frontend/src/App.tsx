@@ -15,6 +15,7 @@ import { OrdersPage } from './pages/OrdersPage'
 import { PackPage } from './pages/PackPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminHeroPage } from './pages/admin/AdminHeroPage'
 import { AdminPackEditPage } from './pages/admin/AdminPackEditPage'
 import { AdminPacksPage } from './pages/admin/AdminPacksPage'
 import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage'
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="packs" element={<AdminPacksPage />} />
               <Route path="packs/new" element={<AdminPackEditPage />} />
               <Route path="packs/:slug" element={<AdminPackEditPage />} />
+              <Route path="hero" element={<AdminHeroPage />} />
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="users/:id" element={<AdminUserDetailPage />} />
               <Route path="tiers" element={<AdminTiersPage />} />

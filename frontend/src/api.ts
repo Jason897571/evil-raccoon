@@ -158,6 +158,17 @@ export const ITCH_URL = 'https://evil-raccoon.itch.io'
 
 // ---------- 管理后台 ----------
 
+export type AdminHeroSlot = {
+  position: number
+  label: string
+  gif_url: string
+  skill_code: string | null
+  skill_name: string | null
+  pack_slug: string | null
+  pack_name: string | null
+  pack_published: boolean | null
+}
+
 export type AdminSkill = {
   code: string
   sort_order: number

@@ -44,6 +44,30 @@ class HeroTile(BaseModel):
     gif_url: str
 
 
+HERO_SIZE = 12
+
+
+class AdminHeroSlot(BaseModel):
+    position: int
+    label: str
+    gif_url: str
+    skill_code: str | None
+    skill_name: str | None
+    pack_slug: str | None
+    pack_name: str | None
+    pack_published: bool | None
+
+
+class HeroSlotIn(BaseModel):
+    label: str = Field(min_length=1, max_length=16)
+    skill_code: str | None = Field(default=None, max_length=96)
+    gif_url: str = Field(default="", max_length=255)  # 留空就用技能的预览 GIF
+
+
+class HeroUpdate(BaseModel):
+    slots: list[HeroSlotIn] = Field(min_length=HERO_SIZE, max_length=HERO_SIZE)
+
+
 class Stats(BaseModel):
     packs: int
     skills: int
