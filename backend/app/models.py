@@ -132,7 +132,7 @@ class OrderItem(Base):
 
 
 class SupportTier(Base):
-    """每月发电（充电）档位，管理员在后台编辑。支持者扫支付宝收款码自愿付款，档位只是建议金额。"""
+    """每月发电（充电）档位，管理员在后台编辑。支持者选档位或自定义金额，走支付宝付款。"""
 
     __tablename__ = "support_tiers"
 
@@ -161,11 +161,21 @@ class ApiToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
-class SiteSetting(Base):
-    """站点级的零散配置（支付宝收款码地址、收款说明等），键值对存。"""
+class SupportPayment(Base):
+    """一笔发电（支持）付款。可以按档位，也可以自定义金额；登录不是必须的。"""
 
-    __tablename__ = "site_settings"
+    __tablename__ = "support_payments"
 
-    key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    value: Mapped[str] = mapped_column(Text)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    out_trade_no: Mapped[str] = mapped_column(String(32), unique=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    tier_id: Mapped[int | None] = mapped_column(ForeignKey("support_tiers.id", ondelete="SET NULL"))
+    tier_name: Mapped[str | None] = mapped_column(String(64))  # 快照，档位改名 / 删除后照样能看
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    supporter_name: Mapped[str | None] = mapped_column(String(32))
+    message: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending / paid
+    payment_method: Mapped[str | None] = mapped_column(String(32))  # alipay / mock
+    payment_ref: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)

@@ -1,0 +1,9 @@
+.venv
+.env
+netdisk.json
+media
+tests
+seed
+scripts
+.pytest_cache
+**/__pycache__

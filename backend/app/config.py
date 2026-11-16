@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str | None = None
 
+    # 网站对外地址（支付宝付完跳回来用）
+    site_url: str = "http://localhost:5180"
+
+    # 支付宝电脑网站支付；不配就只能用开发环境的模拟支付
+    alipay_app_id: str | None = None
+    alipay_private_key: str | None = None  # 应用私钥，PEM 或裸 base64
+    alipay_public_key: str | None = None  # 支付宝公钥（不是应用公钥）
+    alipay_notify_url: str | None = None  # 公网可达，例如 https://www.railraccoon.top/api/payments/alipay/notify
+    alipay_sandbox: bool = False
+
     @property
     def is_dev(self) -> bool:
         return self.app_env == "dev"

@@ -13,7 +13,9 @@ import { OrdersPage } from './pages/OrdersPage'
 import { PackPage } from './pages/PackPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminTiersPage } from './pages/admin/AdminTiersPage'
+import { AdminSupportersPage } from './pages/admin/AdminSupportersPage'
 import { AdminTokensPage } from './pages/admin/AdminTokensPage'
+import { SupportThanksPage } from './pages/SupportThanksPage'
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation()
@@ -34,12 +36,14 @@ export default function App() {
             <Route path="/packs/:slug" element={<PackPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/support/thanks" element={<SupportThanksPage />} />
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
             <Route path="/orders/:orderNo" element={<RequireAuth><OrderPage /></RequireAuth>} />
             <Route path="/library" element={<RequireAuth><LibraryPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
               <Route index element={<Navigate to="tiers" replace />} />
               <Route path="tiers" element={<AdminTiersPage />} />
+              <Route path="supporters" element={<AdminSupportersPage />} />
               <Route path="tokens" element={<AdminTokensPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />

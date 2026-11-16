@@ -4,9 +4,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.catalog import ELEMENT_ORDER, HERO_TILES
 from app.db import get_session
-from app.models import Pack, Skill, SupportTier
-from app.schemas import HeroTile, HomeOut, PackDetail, PackSummary, Stats, SupportInfo
-from app.site_settings import ALIPAY_NOTE, ALIPAY_QR_URL, get_setting
+from app.models import Pack, Skill
+from app.schemas import HeroTile, HomeOut, PackDetail, PackSummary, Stats
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
@@ -63,17 +62,3 @@ def pack_detail(slug: str, db: Session = Depends(get_session)) -> PackDetail:
         skills=pack.skills,
         related=[to_summary(p) for p in others[:4]],
     )
-
-
-def support_info(db: Session) -> SupportInfo:
-    stmt = select(SupportTier).where(SupportTier.is_active.is_(True)).order_by(SupportTier.sort_order, SupportTier.id)
-    return SupportInfo(
-        alipay_qr_url=get_setting(db, ALIPAY_QR_URL),
-        alipay_note=get_setting(db, ALIPAY_NOTE, "") or "",
-        tiers=list(db.scalars(stmt)),
-    )
-
-
-@router.get("/support", response_model=SupportInfo)
-def support(db: Session = Depends(get_session)) -> SupportInfo:
-    return support_info(db)

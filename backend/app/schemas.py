@@ -148,15 +148,37 @@ class TierPatch(BaseModel):
 
 
 class SupportInfo(BaseModel):
-    """首页「支持我」板块：支付宝收款码 + 建议档位。"""
+    """首页「每月发电」板块。"""
 
-    alipay_qr_url: str | None
-    alipay_note: str
+    pay_enabled: bool  # 支付宝没配置（且不是开发环境）时前端显示「暂未开放」
     tiers: list[TierOut]
 
 
-class SupportPatch(BaseModel):
-    alipay_note: str = Field(max_length=200)
+class SupportPayRequest(BaseModel):
+    """按档位付（tier_id）或自定义金额（amount_cents，1 元 ~ 5000 元），二选一。"""
+
+    tier_id: int | None = None
+    amount_cents: int | None = Field(default=None, ge=100, le=500_000)
+    name: str | None = Field(default=None, max_length=32)
+    message: str | None = Field(default=None, max_length=200)
+
+
+class PayStart(BaseModel):
+    out_trade_no: str
+    pay_url: str  # 跳转地址：支付宝收银台，开发环境模拟支付时是站内的结果页
+
+
+class SupportPaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    out_trade_no: str
+    status: Literal["pending", "paid"]
+    amount_cents: int
+    tier_name: str | None
+    supporter_name: str | None
+    message: str | None
+    created_at: UtcDatetime
+    paid_at: UtcDatetime | None
 
 
 # ---------- API token ----------

@@ -68,7 +68,18 @@ export type Tier = {
   sort_order: number
 }
 
-export type SupportInfo = { alipay_qr_url: string | null; alipay_note: string; tiers: Tier[] }
+export type SupportInfo = { pay_enabled: boolean; tiers: Tier[] }
+export type PayStart = { out_trade_no: string; pay_url: string }
+export type SupportPayment = {
+  out_trade_no: string
+  status: 'pending' | 'paid'
+  amount_cents: number
+  tier_name: string | null
+  supporter_name: string | null
+  message: string | null
+  created_at: string
+  paid_at: string | null
+}
 
 export type ApiToken = {
   id: number
@@ -119,12 +130,6 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 export const postJson = <T>(path: string, body?: unknown) => send<T>('POST', path, body)
 export const patchJson = <T>(path: string, body: unknown) => send<T>('PATCH', path, body)
 export const deleteJson = <T = void>(path: string) => send<T>('DELETE', path)
-
-export async function uploadFile<T>(path: string, file: File): Promise<T> {
-  const form = new FormData()
-  form.append('file', file)
-  return handle<T>(await fetch(path, { method: 'POST', body: form }), path)
-}
 
 export const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 

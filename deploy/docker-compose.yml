@@ -1,0 +1,38 @@
+# Evil Raccoon 线上部署（服务器 /opt/evil-raccoon）
+#
+# 服务名特意用 er- 前缀：er-web 会加入 raccoon 的 docker 网络，供 raccoon 的 nginx 转发域名流量；
+# 如果也叫 web / api，会和 raccoon 自己的服务别名撞上，把它的流量分到这边来。
+#
+# 镜像 tag 写在同目录 .env 的 TAG=（scripts/deploy.sh 会自动更新）。
+name: evil-raccoon
+
+services:
+  er-api:
+    image: evil-raccoon-api:${TAG:?TAG 未设置}
+    env_file: .env
+    volumes:
+      - ./media:/app/media
+    restart: unless-stopped
+    mem_limit: 300m   # 这台机器只有 1.8G，别让新站挤到 raccoon
+    networks: [default]
+
+  er-web:
+    image: evil-raccoon-web:${TAG:?TAG 未设置}
+    volumes:
+      - ./media:/usr/share/nginx/media:ro
+    depends_on:
+      er-api:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 64m
+    ports:
+      - "127.0.0.1:8090:80"   # 只给本机调试用，对外走 raccoon 的 nginx
+    networks:
+      default: {}
+      raccoon:
+        aliases: [evil-raccoon-web]
+
+networks:
+  raccoon:
+    external: true
+    name: raccoon_default

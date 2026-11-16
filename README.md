@@ -3,8 +3,8 @@
 64×64 像素技能特效的自建商店。前端 React（Vite + TypeScript），后端 Python（FastAPI + SQLAlchemy + Alembic），数据库 MySQL。
 
 当前进度：首页、特效包详情页（GIF / PNG 预览）、购物车、邮箱验证码登录、订单、「我的素材」（付款后显示网盘链接）、
-管理后台（支付宝收款码、充电档位编辑、API token），以及用 token 通过 API 上下架和修改内容。
-**真实支付还没接**：开发环境用订单页的「模拟支付」按钮代替。
+管理后台（充电档位、发电记录、API token），用 token 通过 API 上下架和修改内容，以及支付宝电脑网站支付（买特效包和发电）。
+线上部署见 [deploy/README.md](deploy/README.md)。
 
 ## 本地运行
 
@@ -54,13 +54,21 @@ uv run pytest      # 用单独的 evil_raccoon_test 库，不碰开发数据
 
 - 登录：邮箱 → 6 位验证码（10 分钟有效，60 秒内不能重发，每小时最多 10 次，输错 5 次作废）。第一次登录自动注册。会话放在 httpOnly cookie 里，30 天有效。验证码和会话 token 在库里只存 HMAC。
 - 订单：`pending` → `paid` / `cancelled`。下单时存一份包名和价格快照；已经买过的包不能重复下单。
-- 付款成功的唯一入口是 `app/routers/orders.py` 里的 `mark_paid()`。接支付宝 / 微信时，在回调里验签后调用它即可。
+- 付款成功的唯一入口是 `app/routers/orders.py` 里的 `mark_paid()`。
+
+## 支付宝
+
+- 用的是电脑网站支付（`alipay.trade.page.pay`）：下单 → 跳支付宝收银台 → 付完跳回网站。
+- 到账确认两条路：支付宝异步通知 `POST /api/payments/alipay/notify`（验签、核对 app_id 和金额），
+  以及用户跳回订单页 / 感谢页时后端主动查单（`alipay.trade.query`）。通知没到也能确认付款。
+- 单号前缀：`ER` 是特效包订单，`ES` 是发电。
+- 没配支付宝时：开发环境订单页有「模拟支付」、发电直接当成功；正式环境显示「在线支付暂未开放」。
 
 ## 管理后台和 API token
 
 - 管理员登录后顶栏有「管理」：
-  - **支付宝收款码**：上传你的收款码图片（会统一转存成 PNG），可以加一句收款说明。首页点「支持」弹出这张码，支持者扫码自愿付款，钱直接进你的支付宝，**系统不记录金额和付款人**。
-  - **充电档位**：首页「每月发电」的建议金额，可以新增、编辑（名称、每月价格、权益一行一条、是否显示、排序）、删除。档位下方固定有一个「随意支持」。
+  - **充电档位**：首页「每月发电」的档位，可以新增、编辑（名称、每月价格、权益一行一条、是否显示、排序）、删除。档位下方固定有一个「随意支持」（1 ~ 5000 元自定义）。
+  - **发电记录**：已付款的发电（金额、档位、称呼、留言）。
   - **API Token**：创建时完整 token 只显示一次（库里只存哈希），可以随时吊销。
 - 带上 `Authorization: Bearer <token>` 就能调 `/api/admin/...`：上下架、改特效包和技能文案、改充电档位。token **不能**创建或吊销 token，这件事只能在登录的后台里做。
 - 下架（`is_published: false`）后：前台列表和详情都看不到，不能下单；已经买过的人在「我的素材」里照样能拿到链接。
@@ -87,14 +95,18 @@ curl -X PATCH -H "Authorization: Bearer er_xxx" -H "Content-Type: application/js
 | POST | `/api/orders/{no}/cancel` | 取消待付款订单 |
 | POST | `/api/orders/{no}/mock-pay` | 模拟付款（只在 `APP_ENV=dev` 时存在） |
 | GET | `/api/library` | 已购买的包和网盘链接 |
-| GET | `/api/support` | 首页支持板块：收款码地址、收款说明、显示中的档位 |
+| GET | `/api/support` | 首页发电板块：档位、是否开放支付 |
+| POST | `/api/support/pay` | 发电下单 `{tier_id}` 或 `{amount_cents}`，可带 name、message，返回支付宝跳转地址 |
+| GET | `/api/support/payments/{no}` | 发电结果（未到账时会主动查单） |
+| POST | `/api/orders/{no}/pay` | 订单去支付宝付款，返回跳转地址 |
+| POST | `/api/orders/{no}/sync` | 跳回订单页时主动查单 |
+| POST | `/api/payments/alipay/notify` | 支付宝异步通知 |
 | GET | `/api/admin/packs`、`/api/admin/packs/{slug}` | 全部特效包（含下架、网盘链接）🔑 |
 | PATCH | `/api/admin/packs/{slug}` | 上下架 / 改名称、价格、简介、排序、网盘链接 🔑 |
 | PATCH | `/api/admin/packs/{slug}/skills/{code}` | 改技能名字、说明、动画阶段 🔑 |
 | GET / POST | `/api/admin/tiers` | 充电档位列表 / 新增 🔑 |
 | PATCH / DELETE | `/api/admin/tiers/{id}` | 编辑 / 删除档位 🔑 |
-| GET / PATCH | `/api/admin/support` | 读取 / 修改收款说明 `{alipay_note}` 🔑 |
-| POST / DELETE | `/api/admin/support/alipay-qr` | 上传（multipart，字段名 file，≤5MB）/ 删除收款码 🔑 |
+| GET | `/api/admin/support/payments` | 发电记录（默认只看已付款）🔑 |
 | GET / POST | `/api/admin/tokens`、`/api/admin/tokens/{id}/revoke` | 管理 token（只能登录的管理员） |
 
 🔑 = 登录的管理员或 API token 都能调。完整文档：`http://localhost:8100/docs`。

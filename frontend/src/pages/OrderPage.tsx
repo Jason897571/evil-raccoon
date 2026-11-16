@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { NotFoundError, STATUS_LABEL, formatPrice, formatTime, postJson, type Order } from '../api'
+import { NotFoundError, STATUS_LABEL, formatPrice, formatTime, postJson, type Order, type PayStart } from '../api'
 import { useAuth } from '../auth'
 import { useCart } from '../cart'
 import { SiteHeader } from '../components/SiteHeader'
@@ -19,6 +19,15 @@ export function OrderPage() {
   const order = updated ?? fetched.data
   const paid = order?.status === 'paid'
 
+  // 从支付宝付完跳回来时，支付宝的到账通知可能还没到：进页面先让后端主动查一次单
+  const pendingNo = fetched.data?.status === 'pending' ? fetched.data.order_no : null
+  useEffect(() => {
+    if (!pendingNo) return
+    postJson<Order>(`/api/orders/${encodeURIComponent(pendingNo)}/sync`)
+      .then((o) => { if (o.status !== 'pending') setUpdated(o) })
+      .catch(() => {}) // 查不到就保持待付款，用户可以点按钮重试
+  }, [pendingNo])
+
   // 付款成功后，把这些包从购物车里拿掉
   useEffect(() => {
     if (paid && order) order.items.forEach((i) => remove(i.slug))
@@ -26,7 +35,19 @@ export function OrderPage() {
 
   if (fetched.error instanceof NotFoundError) return <NotFoundPage />
 
-  const act = async (action: 'mock-pay' | 'cancel') => {
+  const payWithAlipay = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await postJson<PayStart>(`/api/orders/${encodeURIComponent(orderNo)}/pay`)
+      window.location.assign(res.pay_url) // 整页跳到支付宝收银台
+    } catch (err) {
+      setError((err as Error).message)
+      setBusy(false)
+    }
+  }
+
+  const act = async (action: 'mock-pay' | 'cancel' | 'sync') => {
     setBusy(true)
     setError(null)
     try {
@@ -83,13 +104,11 @@ export function OrderPage() {
               {order.status === 'pending' && (
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button className="link-btn" onClick={() => void act('cancel')} disabled={busy}>取消订单</button>
-                  {devTools ? (
-                    <button className="btn btn-primary" onClick={() => void act('mock-pay')} disabled={busy}>
-                      模拟支付（开发用）
-                    </button>
-                  ) : (
-                    <button className="btn btn-primary" disabled>支付即将上线</button>
+                  <button className="link-btn" onClick={() => void act('sync')} disabled={busy}>我已付款，刷新状态</button>
+                  {devTools && (
+                    <button className="btn btn-ghost" onClick={() => void act('mock-pay')} disabled={busy}>模拟支付（开发用）</button>
                   )}
+                  <button className="btn btn-primary" onClick={() => void payWithAlipay()} disabled={busy}>支付宝付款</button>
                 </div>
               )}
               {paid && <Link className="btn btn-primary" to="/library">去我的素材下载</Link>}

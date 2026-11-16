@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app import alipay_client
 from app.config import settings
 from app.db import get_session
 from app.deps import current_user
 from app.models import Order, OrderItem, Pack, User, utcnow
-from app.schemas import CreateOrder, LibraryItem, OrderItemOut, OrderOut
+from app.schemas import CreateOrder, LibraryItem, OrderItemOut, OrderOut, PayStart
 
 router = APIRouter(prefix="/api", tags=["orders"])
 
@@ -112,6 +113,34 @@ def cancel_order(order_no: str, user: User = Depends(current_user), db: Session 
     order.status = "cancelled"
     order.cancelled_at = utcnow()
     db.commit()
+    return order_out(order)
+
+
+@router.post("/orders/{order_no}/pay", response_model=PayStart)
+def pay_order(order_no: str, user: User = Depends(current_user), db: Session = Depends(get_session)) -> PayStart:
+    """去支付宝付款：返回收银台地址，前端整页跳转过去。"""
+    order = get_own_order(db, user, order_no)
+    if order.status != "pending":
+        raise HTTPException(status_code=409, detail="这个订单不是待付款状态")
+    if not alipay_client.is_configured():
+        raise HTTPException(status_code=503, detail="在线支付暂未开放")
+    names = "、".join(i.pack_name for i in order.items)
+    url = alipay_client.page_pay_url(
+        order.order_no, order.total_cents, f"Evil Raccoon 像素特效：{names}",
+        f"{settings.site_url}/orders/{order.order_no}",
+    )
+    return PayStart(out_trade_no=order.order_no, pay_url=url)
+
+
+@router.post("/orders/{order_no}/sync", response_model=OrderOut)
+def sync_order(order_no: str, user: User = Depends(current_user), db: Session = Depends(get_session)) -> OrderOut:
+    """付完跳回订单页时调用：还没收到支付宝通知就主动查一次单。"""
+    order = get_own_order(db, user, order_no)
+    if order.status == "pending" and alipay_client.is_configured():
+        paid, trade_no, amount = alipay_client.query_paid(order.order_no)
+        if paid and alipay_client.amount_matches(amount, order.total_cents):
+            mark_paid(db, order, "alipay", trade_no)
+            db.commit()
     return order_out(order)
 
 

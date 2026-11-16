@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { deleteJson, getJson, patchJson, postJson, uploadFile, type SupportInfo, type Tier } from '../../api'
+import { deleteJson, getJson, patchJson, postJson, type Tier } from '../../api'
 
 type Draft = {
   name: string
@@ -49,10 +49,9 @@ export function AdminTiersPage() {
 
   return (
     <section>
-      <AlipayQrCard />
       <div className="admin-bar">
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          首页「每月发电」显示的建议档位，点「支持」会弹出上面的收款码。权益一行写一条，排序数字小的在前。
+          首页「每月发电」的档位，支持者选了档位就按这个金额走支付宝付款（也可以自定义金额）。权益一行写一条，排序数字小的在前。
         </p>
         {!adding && <button className="btn btn-primary" onClick={() => setAdding(true)}>新增档位</button>}
       </div>
@@ -150,79 +149,5 @@ function TierForm({ tier, onSave, onCancel, onDelete }: {
         <button className="btn btn-primary" style={{ height: 44, fontSize: 20 }} disabled={busy}>{tier ? '保存' : '创建'}</button>
       </div>
     </form>
-  )
-}
-
-function AlipayQrCard() {
-  const [info, setInfo] = useState<SupportInfo | null>(null)
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-
-  useEffect(() => {
-    getJson<SupportInfo>('/api/admin/support')
-      .then((data) => {
-        setInfo(data)
-        setNote(data.alipay_note)
-      })
-      .catch((err: Error) => setMsg({ ok: false, text: err.message }))
-  }, [])
-
-  const run = async (fn: () => Promise<SupportInfo>, okText: string) => {
-    setBusy(true)
-    setMsg(null)
-    try {
-      const data = await fn()
-      setInfo(data)
-      setNote(data.alipay_note)
-      setMsg({ ok: true, text: okText })
-    } catch (err) {
-      setMsg({ ok: false, text: (err as Error).message })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="card qr-card">
-      <div className="qr-preview">
-        {info?.alipay_qr_url ? <img src={info.alipay_qr_url} alt="当前的支付宝收款码" /> : <span className="muted">还没上传</span>}
-      </div>
-      <div className="qr-form">
-        <h2 className="px" style={{ margin: 0, fontSize: 24 }}>支付宝收款码</h2>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          支持者扫这张码自愿付款，钱直接进你的支付宝，系统不记录金额。支付宝 App › 收钱 › 保存收款码图片后上传（PNG / JPG，5MB 以内）。
-        </p>
-        <label className="btn btn-primary upload-btn" style={{ height: 44, fontSize: 20 }}>
-          {info?.alipay_qr_url ? '换一张' : '上传收款码'}
-          <input
-            type="file" accept="image/png,image/jpeg" disabled={busy} className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              e.target.value = ''
-              if (file) void run(() => uploadFile<SupportInfo>('/api/admin/support/alipay-qr', file), '收款码已更新')
-            }}
-          />
-        </label>
-        <div className="field">
-          <label htmlFor="qr-note">收款说明（选填，弹窗里显示）</label>
-          <input id="qr-note" value={note} maxLength={200} placeholder="比如：付款时备注你的昵称，我会记在感谢名单里" onChange={(e) => setNote(e.target.value)} />
-        </div>
-        <div className="tier-actions" style={{ marginTop: 0 }}>
-          {msg && <span className={msg.ok ? 'ok-text' : 'form-error'} role="status">{msg.text}</span>}
-          <span className="grow" />
-          {info?.alipay_qr_url && (
-            <button type="button" className="link-btn" disabled={busy}
-              onClick={() => { if (window.confirm('删除收款码后，首页的支持弹窗会显示「还没设置」，确定吗？')) void run(() => deleteJson<SupportInfo>('/api/admin/support/alipay-qr'), '已删除') }}>
-              删除收款码
-            </button>
-          )}
-          <button type="button" className="btn btn-ghost" style={{ height: 44, fontSize: 20 }} disabled={busy}
-            onClick={() => void run(() => patchJson<SupportInfo>('/api/admin/support', { alipay_note: note }), '说明已保存')}>
-            保存说明
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
