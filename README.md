@@ -3,7 +3,7 @@
 64×64 像素技能特效的自建商店。前端 React（Vite + TypeScript），后端 Python（FastAPI + SQLAlchemy + Alembic），数据库 MySQL。
 
 当前进度：首页、特效包详情页（GIF / PNG 预览）、购物车、邮箱验证码登录、订单、「我的素材」（付款后显示网盘链接）、
-管理后台（充电档位编辑、API token），以及用 token 通过 API 上下架和修改内容。
+管理后台（支付宝收款码、充电档位编辑、API token），以及用 token 通过 API 上下架和修改内容。
 **真实支付还没接**：开发环境用订单页的「模拟支付」按钮代替。
 
 ## 本地运行
@@ -24,12 +24,7 @@ npm install
 npm run dev        # http://localhost:5180，/api 和 /media 代理到 8100
 ```
 
-设管理员（邮箱没注册过也行，之后用它登录就是管理员）：
-
-```bash
-cd backend
-uv run python -m scripts.set_admin you@example.com            # 取消加 --revoke
-```
+**管理员只有一个：第一个注册（第一次登录）的用户。** 新部署后请先用你自己的邮箱登录一次；之后注册的都是普通客户，系统里没有其他设管理员的途径。
 
 配置项见 `backend/.env.example`。开发模式下不配发信邮箱也能登录：验证码会直接显示在登录页上，后端日志里也有。
 
@@ -64,7 +59,8 @@ uv run pytest      # 用单独的 evil_raccoon_test 库，不碰开发数据
 ## 管理后台和 API token
 
 - 管理员登录后顶栏有「管理」：
-  - **充电档位**：首页「每月发电」显示的档位，可以新增、编辑（名称、每月价格、权益一行一条、按钮链接、是否显示、排序）、删除。发电付款目前仍跳到爱发电。
+  - **支付宝收款码**：上传你的收款码图片（会统一转存成 PNG），可以加一句收款说明。首页点「支持」弹出这张码，支持者扫码自愿付款，钱直接进你的支付宝，**系统不记录金额和付款人**。
+  - **充电档位**：首页「每月发电」的建议金额，可以新增、编辑（名称、每月价格、权益一行一条、是否显示、排序）、删除。档位下方固定有一个「随意支持」。
   - **API Token**：创建时完整 token 只显示一次（库里只存哈希），可以随时吊销。
 - 带上 `Authorization: Bearer <token>` 就能调 `/api/admin/...`：上下架、改特效包和技能文案、改充电档位。token **不能**创建或吊销 token，这件事只能在登录的后台里做。
 - 下架（`is_published: false`）后：前台列表和详情都看不到，不能下单；已经买过的人在「我的素材」里照样能拿到链接。
@@ -91,12 +87,14 @@ curl -X PATCH -H "Authorization: Bearer er_xxx" -H "Content-Type: application/js
 | POST | `/api/orders/{no}/cancel` | 取消待付款订单 |
 | POST | `/api/orders/{no}/mock-pay` | 模拟付款（只在 `APP_ENV=dev` 时存在） |
 | GET | `/api/library` | 已购买的包和网盘链接 |
-| GET | `/api/support-tiers` | 首页显示的充电档位 |
+| GET | `/api/support` | 首页支持板块：收款码地址、收款说明、显示中的档位 |
 | GET | `/api/admin/packs`、`/api/admin/packs/{slug}` | 全部特效包（含下架、网盘链接）🔑 |
 | PATCH | `/api/admin/packs/{slug}` | 上下架 / 改名称、价格、简介、排序、网盘链接 🔑 |
 | PATCH | `/api/admin/packs/{slug}/skills/{code}` | 改技能名字、说明、动画阶段 🔑 |
 | GET / POST | `/api/admin/tiers` | 充电档位列表 / 新增 🔑 |
 | PATCH / DELETE | `/api/admin/tiers/{id}` | 编辑 / 删除档位 🔑 |
+| GET / PATCH | `/api/admin/support` | 读取 / 修改收款说明 `{alipay_note}` 🔑 |
+| POST / DELETE | `/api/admin/support/alipay-qr` | 上传（multipart，字段名 file，≤5MB）/ 删除收款码 🔑 |
 | GET / POST | `/api/admin/tokens`、`/api/admin/tokens/{id}/revoke` | 管理 token（只能登录的管理员） |
 
 🔑 = 登录的管理员或 API token 都能调。完整文档：`http://localhost:8100/docs`。

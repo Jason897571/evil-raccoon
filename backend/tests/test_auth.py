@@ -1,10 +1,10 @@
 from datetime import timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.db import engine
-from app.models import LoginCode
+from app.models import LoginCode, User
 from tests.conftest import login
 
 
@@ -69,3 +69,21 @@ def test_expired_code_rejected(client):
 
 def test_invalid_email_rejected(client):
     assert client.post("/api/auth/code", json={"email": "not-an-email"}).status_code == 422
+
+
+def test_only_first_registered_user_is_admin(client):
+    with Session(engine) as db:
+        db.execute(delete(User))
+        db.commit()
+
+    login(client, "first@example.com")
+    assert client.get("/api/auth/me").json()["user"]["is_admin"] is True
+    client.post("/api/auth/logout")
+
+    login(client, "second@example.com")
+    assert client.get("/api/auth/me").json()["user"]["is_admin"] is False
+    client.post("/api/auth/logout")
+
+    # 全库只有一个管理员，就是第一个注册的
+    with Session(engine) as db:
+        assert db.scalars(select(User.email).where(User.is_admin.is_(True))).all() == ["first@example.com"]

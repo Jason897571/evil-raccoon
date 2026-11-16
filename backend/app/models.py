@@ -132,7 +132,7 @@ class OrderItem(Base):
 
 
 class SupportTier(Base):
-    """每月发电（充电）档位，管理员在后台编辑。"""
+    """每月发电（充电）档位，管理员在后台编辑。支持者扫支付宝收款码自愿付款，档位只是建议金额。"""
 
     __tablename__ = "support_tiers"
 
@@ -140,7 +140,6 @@ class SupportTier(Base):
     name: Mapped[str] = mapped_column(String(64))
     price_cents: Mapped[int] = mapped_column(Integer)  # 每月
     description: Mapped[str] = mapped_column(Text, default="")  # 一行一条权益
-    link_url: Mapped[str | None] = mapped_column(String(512))  # 发电按钮跳转；空就用爱发电主页
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -160,3 +159,13 @@ class ApiToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class SiteSetting(Base):
+    """站点级的零散配置（支付宝收款码地址、收款说明等），键值对存。"""
+
+    __tablename__ = "site_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

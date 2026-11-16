@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { AFDIAN_URL, formatPrice, type Home, type PackSummary, type Tier } from '../api'
+import { useLocation } from 'react-router-dom'
+import { formatShortPrice, type Home, type PackSummary, type SupportInfo } from '../api'
 import { HeroTile } from '../components/HeroTile'
 import { PackCard } from '../components/PackCard'
 import { SiteHeader } from '../components/SiteHeader'
+import { SupportSection } from '../components/SupportSection'
 import { useApi } from '../useApi'
 
 const ALL = '全部'
@@ -11,7 +12,8 @@ const ALL = '全部'
 export function HomePage() {
   const home = useApi<Home>('/api/home')
   const packs = useApi<PackSummary[]>('/api/packs')
-  const tiers = useApi<Tier[]>('/api/support-tiers')
+  const support = useApi<SupportInfo>('/api/support')
+  const tiers = support.data?.tiers
   const [element, setElement] = useState(ALL)
   const { hash } = useLocation()
 
@@ -51,7 +53,7 @@ export function HomePage() {
             <div className="hero-ctas">
               <a className="btn btn-primary" href="#packs">查看全部特效包</a>
               <a className="btn btn-ghost" href="#support">
-                {tiers.data?.length ? `${formatPrice(Math.min(...tiers.data.map((t) => t.price_cents))).replace(/\.00$/, '')}/月 发电` : '每月发电'}
+                {tiers?.length ? `${formatShortPrice(Math.min(...tiers.map((t) => t.price_cents)))}/月 发电` : '每月发电'}
               </a>
             </div>
           </div>
@@ -101,37 +103,7 @@ export function HomePage() {
 
         <section id="support" className="section">
           <div className="container">
-            <div className="support">
-              <h2 className="section-title">每月发电</h2>
-              <p style={{ margin: '18px 0 0', color: 'var(--text-3)' }}>
-                发电的朋友能提前看到我之后要发布的作品。你的支持会变成下一个特效包。
-              </p>
-              {tiers.data?.map((t) => (
-                <div className="plan" key={t.id}>
-                  <div>
-                    <div className="px" style={{ fontSize: 24 }}>{t.name}</div>
-                    {t.description && (
-                      <ul className="bullets" style={{ marginTop: 6 }}>
-                        {t.description.split('\n').filter((line) => line.trim()).map((line) => <li key={line}>{line}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <span>
-                      <span className="px" style={{ fontSize: 36, color: 'var(--accent)' }}>{formatPrice(t.price_cents).replace(/\.00$/, '')}</span>
-                      <span className="muted"> / 月</span>
-                    </span>
-                    <a className="btn btn-primary" style={{ height: 48 }} href={t.link_url ?? AFDIAN_URL} target="_blank" rel="noreferrer">
-                      发电
-                    </a>
-                  </div>
-                </div>
-              ))}
-              <p className="muted" style={{ margin: '24px 0 0', fontSize: 13 }}>
-                目前发电在 <a href={AFDIAN_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>爱发电</a> 完成 ·
-                想要定制特效也欢迎来聊 · <Link to="/cart" style={{ textDecoration: 'underline' }}>查看购物车</Link>
-              </p>
-            </div>
+            <SupportSection info={support.data} />
           </div>
         </section>
       </main>

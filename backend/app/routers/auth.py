@@ -67,7 +67,9 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_sess
     record.used_at = now
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
-        user = User(email=email, created_at=now)
+        # 管理员只有一个：第一个注册的用户。之后注册的都是普通客户，系统里没有别的途径设管理员。
+        is_first = (db.scalar(select(func.count(User.id))) or 0) == 0
+        user = User(email=email, created_at=now, is_admin=is_first)
         db.add(user)
     user.last_login_at = now
     db.flush()

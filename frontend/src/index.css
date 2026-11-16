@@ -384,3 +384,23 @@ img { display: block; max-width: 100%; }
   font-size: 12px; line-height: 1.7; color: var(--text-2);
 }
 code { font-family: ui-monospace, Menlo, monospace; }
+
+/* ---------- 支付宝收款码 ---------- */
+.plan-free { border-style: dashed; }
+.support-dialog {
+  padding: 0; border: 2px solid var(--tile-line); background: var(--tile); color: var(--text);
+  box-shadow: 8px 8px 0 var(--shadow); max-width: min(420px, calc(100vw - 32px));
+}
+.support-dialog::backdrop { background: rgba(8, 7, 20, 0.75); }
+.support-dialog-body { padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.support-dialog .qr { width: 280px; max-width: 100%; height: auto; background: #fff; padding: 8px; image-rendering: auto; }
+
+.qr-card { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 40px; border-color: var(--accent); }
+.qr-preview {
+  flex: none; width: 180px; height: 180px; background: var(--bg); border: 2px dashed var(--btn-line);
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.qr-preview img { max-width: 100%; max-height: 100%; image-rendering: auto; }
+.qr-form { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.upload-btn { align-self: flex-start; position: relative; }
+.upload-btn:focus-within { outline: 2px solid var(--text); outline-offset: 2px; }

@@ -64,10 +64,11 @@ export type Tier = {
   name: string
   price_cents: number
   description: string
-  link_url: string | null
   is_active: boolean
   sort_order: number
 }
+
+export type SupportInfo = { alipay_qr_url: string | null; alipay_note: string; tiers: Tier[] }
 
 export type ApiToken = {
   id: number
@@ -117,9 +118,18 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const postJson = <T>(path: string, body?: unknown) => send<T>('POST', path, body)
 export const patchJson = <T>(path: string, body: unknown) => send<T>('PATCH', path, body)
-export const deleteJson = (path: string) => send<void>('DELETE', path)
+export const deleteJson = <T = void>(path: string) => send<T>('DELETE', path)
+
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const form = new FormData()
+  form.append('file', file)
+  return handle<T>(await fetch(path, { method: 'POST', body: form }), path)
+}
 
 export const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
+
+/** 整数金额去掉 .00：¥5、¥19.90 */
+export const formatShortPrice = (cents: number) => formatPrice(cents).replace(/\.00$/, '')
 
 export const formatTime = (iso: string) =>
   new Date(iso).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })

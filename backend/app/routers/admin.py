@@ -4,26 +4,35 @@
 - token 本身的创建 / 吊销：只能由登录的管理员在后台操作，token 不能再生 token。
 """
 
+import hashlib
 import secrets
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import settings
 from app.db import get_session
 from app.deps import AdminActor, admin_actor, admin_user
 from app.models import ApiToken, Pack, Skill, SupportTier, User, utcnow
 from app.schemas import (
-    AdminPack, AdminSkill, PackPatch, SkillPatch, TierIn, TierOut, TierPatch, TokenCreate, TokenCreated, TokenOut,
+    AdminPack, AdminSkill, PackPatch, SkillPatch, SupportInfo, SupportPatch, TierIn, TierOut, TierPatch, TokenCreate,
+    TokenCreated, TokenOut,
 )
+from app.routers.catalog import support_info
+from app.site_settings import ALIPAY_NOTE, ALIPAY_QR_URL, get_setting, set_setting
 from app.security import digest
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 TOKEN_PREFIX = "er_"
 NULLABLE_PACK = {"netdisk_url", "netdisk_code"}
-NULLABLE_TIER = {"link_url"}
+NULLABLE_TIER: set[str] = set()
+QR_MAX_BYTES = 5 * 1024 * 1024
+QR_MAX_SIDE = 1024
 
 
 def apply_patch(obj: object, patch: BaseModel, nullable: set[str]) -> None:
@@ -114,6 +123,64 @@ def update_tier(
 def delete_tier(tier_id: int, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> None:
     db.delete(get_tier(db, tier_id))
     db.commit()
+
+
+# ---------- 支付宝收款码 ----------
+
+@router.get("/support", response_model=SupportInfo)
+def read_support(_: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> SupportInfo:
+    return support_info(db)
+
+
+@router.patch("/support", response_model=SupportInfo)
+def update_support(
+    body: SupportPatch, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
+) -> SupportInfo:
+    set_setting(db, ALIPAY_NOTE, body.alipay_note.strip() or None)
+    db.commit()
+    return support_info(db)
+
+
+def _remove_old_qr(db: Session) -> None:
+    old = get_setting(db, ALIPAY_QR_URL)
+    if old and old.startswith("/media/site/"):
+        (settings.media_dir / old.removeprefix("/media/")).unlink(missing_ok=True)
+
+
+@router.post("/support/alipay-qr", response_model=SupportInfo)
+async def upload_alipay_qr(
+    file: UploadFile, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
+) -> SupportInfo:
+    """上传收款码图片。统一转存成 PNG（顺便去掉图片里的元数据），文件名带内容哈希防缓存。"""
+    data = await file.read(QR_MAX_BYTES + 1)
+    if len(data) > QR_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="图片不能超过 5MB")
+    try:
+        img = Image.open(BytesIO(data))
+        img.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(status_code=422, detail="请上传 PNG 或 JPG 图片") from exc
+    img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+    img.thumbnail((QR_MAX_SIDE, QR_MAX_SIDE))
+    out = BytesIO()
+    img.save(out, format="PNG", optimize=True)
+
+    name = f"alipay-qr-{hashlib.sha256(out.getvalue()).hexdigest()[:10]}.png"
+    target = settings.media_dir / "site" / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _remove_old_qr(db)
+    target.write_bytes(out.getvalue())
+    set_setting(db, ALIPAY_QR_URL, f"/media/site/{name}")
+    db.commit()
+    return support_info(db)
+
+
+@router.delete("/support/alipay-qr", response_model=SupportInfo)
+def delete_alipay_qr(_: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> SupportInfo:
+    _remove_old_qr(db)
+    set_setting(db, ALIPAY_QR_URL, None)
+    db.commit()
+    return support_info(db)
 
 
 # ---------- API token（只能在登录的后台里管理） ----------

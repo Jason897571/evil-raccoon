@@ -16,7 +16,12 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from app.db import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import ApiToken, LoginCode, Order, OrderItem, Pack, Skill, SupportTier, User, UserSession  # noqa: E402
+from app.models import (  # noqa: E402
+    ApiToken, LoginCode, Order, OrderItem, Pack, SiteSetting, Skill, SupportTier, User, UserSession,
+)
+
+
+ADMIN_EMAIL = "boss@example.com"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -35,7 +40,7 @@ def schema():
 @pytest.fixture(autouse=True)
 def seed():
     with Session(engine) as db:
-        for model in (ApiToken, SupportTier, OrderItem, Order, UserSession, LoginCode, User, Skill, Pack):
+        for model in (SiteSetting, ApiToken, SupportTier, OrderItem, Order, UserSession, LoginCode, User, Skill, Pack):
             db.execute(delete(model))
         for i, (slug, name, price) in enumerate([("time", "时间", 2990), ("fire", "火焰", 1990), ("wind", "风", 990)]):
             pack = Pack(
@@ -47,6 +52,8 @@ def seed():
                 preview_gif_url="", sheet_url="", sheet_cols=1, sheet_rows=1,
             ))
             db.add(pack)
+        # 站长：第一个注册的用户，也是唯一的管理员。其他测试里登录的都是普通客户。
+        db.add(User(email=ADMIN_EMAIL, is_admin=True))
         db.add(SupportTier(name="邪恶小镰刀", price_cents=500, description="提前看作品", sort_order=0))
         db.add(SupportTier(name="隐藏档", price_cents=3000, description="", is_active=False, sort_order=1))
         db.commit()
@@ -64,8 +71,5 @@ def login(client: TestClient, email: str = "fan@example.com") -> None:
     assert res.status_code == 200, res.text
 
 
-def login_admin(client: TestClient, email: str = "boss@example.com") -> None:
-    with Session(engine) as db:
-        db.add(User(email=email, is_admin=True))
-        db.commit()
-    login(client, email)
+def login_admin(client: TestClient) -> None:
+    login(client, ADMIN_EMAIL)

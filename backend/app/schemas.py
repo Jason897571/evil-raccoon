@@ -127,7 +127,6 @@ class TierOut(BaseModel):
     name: str
     price_cents: int
     description: str
-    link_url: str | None
     is_active: bool
     sort_order: int
 
@@ -136,7 +135,6 @@ class TierIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     price_cents: int = Field(ge=0, le=10_000_000)
     description: str = Field(default="", max_length=2000)
-    link_url: str | None = Field(default=None, max_length=512, pattern=r"^https?://")
     is_active: bool = True
     sort_order: int = 0
 
@@ -145,9 +143,20 @@ class TierPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
     price_cents: int | None = Field(default=None, ge=0, le=10_000_000)
     description: str | None = Field(default=None, max_length=2000)
-    link_url: str | None = Field(default=None, max_length=512, pattern=r"^https?://")
     is_active: bool | None = None
     sort_order: int | None = None
+
+
+class SupportInfo(BaseModel):
+    """首页「支持我」板块：支付宝收款码 + 建议档位。"""
+
+    alipay_qr_url: str | None
+    alipay_note: str
+    tiers: list[TierOut]
+
+
+class SupportPatch(BaseModel):
+    alipay_note: str = Field(max_length=200)
 
 
 # ---------- API token ----------
