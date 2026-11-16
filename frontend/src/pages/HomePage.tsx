@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { formatShortPrice, type Home, type PackSummary, type SupportInfo } from '../api'
+import { SHOW_SUPPORT, formatShortPrice, type Home, type PackSummary, type SupportInfo } from '../api'
 import { HeroTile } from '../components/HeroTile'
 import { PackCard } from '../components/PackCard'
 import { SiteHeader } from '../components/SiteHeader'
@@ -12,7 +12,7 @@ const ALL = '全部'
 export function HomePage() {
   const home = useApi<Home>('/api/home')
   const packs = useApi<PackSummary[]>('/api/packs')
-  const support = useApi<SupportInfo>('/api/support')
+  const support = useApi<SupportInfo>(SHOW_SUPPORT ? '/api/support' : null)
   const tiers = support.data?.tiers
   const [element, setElement] = useState(ALL)
   const { hash } = useLocation()
@@ -52,9 +52,11 @@ export function HomePage() {
             <p className="hero-formats">PNG 精灵图 · GIF · .aseprite 源文件 · Unity / Godot / GameMaker</p>
             <div className="hero-ctas">
               <a className="btn btn-primary" href="#packs">查看全部特效包</a>
-              <a className="btn btn-ghost" href="#support">
-                {tiers?.length ? `${formatShortPrice(Math.min(...tiers.map((t) => t.price_cents)))}/月 发电` : '每月发电'}
-              </a>
+              {SHOW_SUPPORT && (
+                <a className="btn btn-ghost" href="#support">
+                  {tiers?.length ? `${formatShortPrice(Math.min(...tiers.map((t) => t.price_cents)))}/月 发电` : '每月发电'}
+                </a>
+              )}
             </div>
           </div>
           <div className="hero-side">{hero.slice(8, 12).map((t) => <HeroTile key={t.gif_url} tile={t} />)}</div>
@@ -101,11 +103,13 @@ export function HomePage() {
           </div>
         </section>
 
-        <section id="support" className="section">
-          <div className="container">
-            <SupportSection info={support.data} />
-          </div>
-        </section>
+        {SHOW_SUPPORT && (
+          <section id="support" className="section">
+            <div className="container">
+              <SupportSection info={support.data} />
+            </div>
+          </section>
+        )}
       </main>
     </>
   )

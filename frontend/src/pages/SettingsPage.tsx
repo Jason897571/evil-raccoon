@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { formatTime, patchJson, postJson, putJson } from '../api'
+import { SHOW_SUPPORT, formatTime, patchJson, postJson, putJson } from '../api'
 import { useAuth } from '../auth'
 import { SiteHeader } from '../components/SiteHeader'
 
@@ -66,7 +66,7 @@ export function SettingsPage() {
               placeholder={user.email.split('@')[0]}
               onChange={(e) => setName(e.target.value)}
             />
-            <span className="hint">显示在顶栏，发电时会自动填上。留空就用邮箱前缀。</span>
+            <span className="hint">显示在顶栏{SHOW_SUPPORT && '，发电时会自动填上'}。留空就用邮箱前缀。</span>
           </div>
           <div className="settings-meta muted">注册于 {formatTime(user.created_at)}{user.is_admin && ' · 管理员'}</div>
           <div className="settings-actions">

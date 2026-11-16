@@ -3,13 +3,14 @@ import { getJson } from './api'
 
 type Result<T> = { path: string; data: T | null; error: Error | null }
 
-/** 拉取一个 GET 接口；path 变化或调用 reload() 时重新请求，组件卸载时取消。 */
-export function useApi<T>(path: string): { data: T | null; error: Error | null; loading: boolean; reload: () => void } {
+/** 拉取一个 GET 接口；path 变化或调用 reload() 时重新请求，组件卸载时取消。path 为 null 时不请求。 */
+export function useApi<T>(path: string | null): { data: T | null; error: Error | null; loading: boolean; reload: () => void } {
   const [result, setResult] = useState<Result<T> | null>(null)
   const [nonce, setNonce] = useState(0)
   const reload = useCallback(() => setNonce((n) => n + 1), [])
 
   useEffect(() => {
+    if (path === null) return
     const ctrl = new AbortController()
     getJson<T>(path, ctrl.signal)
       .then((data) => setResult({ path, data, error: null }))
@@ -20,5 +21,5 @@ export function useApi<T>(path: string): { data: T | null; error: Error | null; 
   }, [path, nonce])
 
   const current = result?.path === path ? result : null
-  return { data: current?.data ?? null, error: current?.error ?? null, loading: current === null, reload }
+  return { data: current?.data ?? null, error: current?.error ?? null, loading: path !== null && current === null, reload }
 }

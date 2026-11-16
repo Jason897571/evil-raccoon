@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ITCH_URL } from '../api'
+import { ITCH_URL, SHOW_SUPPORT } from '../api'
 import { useAuth } from '../auth'
 import { useCart } from '../cart'
 import { AccountMenu } from './AccountMenu'
@@ -25,7 +25,7 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
       <nav aria-label="主导航" className="site-nav">
         <Link to="/#packs">特效包</Link>
         <Link to="/#how">怎么用</Link>
-        <Link to="/#support">每月发电</Link>
+        {SHOW_SUPPORT && <Link to="/#support">每月发电</Link>}
         <Link to="/cart">购物车 ({items.length})</Link>
         {ready && (user ? (
           <>

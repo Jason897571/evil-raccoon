@@ -150,6 +150,9 @@ export const formatTime = (iso: string) =>
 
 export const STATUS_LABEL: Record<OrderStatus, string> = { pending: '待付款', paid: '已付款', cancelled: '已取消' }
 
+/** 每月发电先对用户隐藏（顶栏入口、首页按钮和板块）；后台的充电档位、发电记录不受影响。改回 true 即恢复。 */
+export const SHOW_SUPPORT = false
+
 export const XHS_URL = 'https://www.xiaohongshu.com/user/profile/5c22a55b00000000070253bb'
 export const ITCH_URL = 'https://evil-raccoon.itch.io'
 
