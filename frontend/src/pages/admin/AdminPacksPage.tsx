@@ -105,14 +105,15 @@ export function AdminPacksPage() {
                   <td>{p.sold_count}</td>
                   <td>{p.netdisk_url ? <span className="pill pill-ok">已填</span> : <span className="pill pill-bad">缺</span>}</td>
                   <td>
-                    <button type="button" className={`pill pill-btn ${p.is_published ? 'pill-ok' : ''}`} disabled={busy === p.slug}
-                      onClick={() => void togglePublish(p)} title={p.is_published ? '点一下下架' : '点一下上架'}>
-                      {p.is_published ? '已上架' : '未上架'}
-                    </button>
+                    <span className={`pill ${p.is_published ? 'pill-ok' : ''}`}>{p.is_published ? '已上架' : '未上架'}</span>
                   </td>
                   <td>
                     <div className="row-actions">
                       <Link to={`/admin/packs/${p.slug}`}>编辑</Link>
+                      <button type="button" className={`text-btn ${p.is_published ? '' : 'ok'}`} disabled={busy === p.slug}
+                        onClick={() => void togglePublish(p)}>
+                        {p.is_published ? '下架' : '上架'}
+                      </button>
                       {p.is_published && <a href={`/packs/${p.slug}`} target="_blank" rel="noreferrer">查看</a>}
                       <button type="button" className="text-btn danger" disabled={busy === p.slug} onClick={() => remove(p)}>删除</button>
                     </div>
