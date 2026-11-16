@@ -7,6 +7,7 @@ import { CartPage } from './pages/CartPage'
 import { HomePage } from './pages/HomePage'
 import { LibraryPage } from './pages/LibraryPage'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OrderPage } from './pages/OrderPage'
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/packs/:slug" element={<PackPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/support/thanks" element={<SupportThanksPage />} />
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />

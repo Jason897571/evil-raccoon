@@ -10,7 +10,8 @@ from app.deps import SESSION_COOKIE, current_user, optional_user
 from app.mailer import send_login_code
 from app.models import LoginCode, User, UserSession, utcnow
 from app.schemas import (
-    CodeRequest, CodeSent, LoginRequest, MeOut, PasswordChange, PasswordLogin, PasswordReset, UpdateMe, UserOut,
+    CodeRequest, CodeSent, LoginRequest, MeOut, PasswordChange, PasswordLogin, PasswordReset, RegisterRequest,
+    UpdateMe, UserOut,
 )
 from app.security import digest, hash_password, new_login_code, new_session_token, same_digest, verify_password
 
@@ -36,6 +37,11 @@ def send_code(body: CodeRequest, db: Session = Depends(get_session)) -> CodeSent
     )
     if recent >= HOURLY_LIMIT:
         raise HTTPException(status_code=429, detail="验证码获取太频繁，请一小时后再试")
+    registered = db.scalar(select(User.id).where(User.email == email)) is not None
+    if body.purpose == "register" and registered:
+        raise HTTPException(status_code=409, detail="这个邮箱已经注册过了，直接登录就行")
+    if body.purpose != "register" and not registered:
+        raise HTTPException(status_code=400, detail="这个邮箱还没注册，先去注册吧")
 
     code = new_login_code()
     try:
@@ -68,14 +74,10 @@ def _consume_code(db: Session, email: str, code: str, now: datetime) -> None:
     record.used_at = now
 
 
-def _get_or_create_user(db: Session, email: str, now: datetime) -> User:
+def _registered_user(db: Session, email: str) -> User:
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
-        # 管理员只有一个：第一个注册的用户。之后注册的都是普通客户，系统里没有别的途径设管理员。
-        is_first = (db.scalar(select(func.count(User.id))) or 0) == 0
-        user = User(email=email, created_at=now, is_admin=is_first)
-        db.add(user)
-        db.flush()
+        raise HTTPException(status_code=400, detail="这个邮箱还没注册，先去注册吧")
     return user
 
 
@@ -91,12 +93,33 @@ def _start_session(db: Session, user: User, response: Response, now: datetime) -
     )
 
 
-@router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_session)) -> User:
+@router.post("/register", response_model=UserOut, status_code=201)
+def register(body: RegisterRequest, response: Response, db: Session = Depends(get_session)) -> User:
+    """注册：邮箱验证码 + 密码（+ 选填昵称），成功后直接登录。"""
     email = body.email.lower()
     now = utcnow()
+    if db.scalar(select(User.id).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="这个邮箱已经注册过了，直接登录就行")
     _consume_code(db, email, body.code, now)
-    user = _get_or_create_user(db, email, now)
+    # 管理员只有一个：第一个注册的用户。之后注册的都是普通客户，系统里没有别的途径设管理员。
+    is_first = (db.scalar(select(func.count(User.id))) or 0) == 0
+    user = User(
+        email=email, created_at=now, is_admin=is_first, password_hash=hash_password(body.password),
+        display_name=(body.display_name or "").strip() or None,
+    )
+    db.add(user)
+    db.flush()
+    _start_session(db, user, response, now)
+    return user
+
+
+@router.post("/login", response_model=UserOut)
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_session)) -> User:
+    """验证码登录，只给已注册的账号用。"""
+    email = body.email.lower()
+    now = utcnow()
+    user = _registered_user(db, email)
+    _consume_code(db, email, body.code, now)
     _start_session(db, user, response, now)
     return user
 
@@ -128,8 +151,8 @@ def password_reset(body: PasswordReset, response: Response, db: Session = Depend
     """忘记密码：用邮箱验证码设新密码，顺便登录。其他设备上的登录全部失效。"""
     email = body.email.lower()
     now = utcnow()
+    user = _registered_user(db, email)
     _consume_code(db, email, body.code, now)
-    user = _get_or_create_user(db, email, now)  # 验证码已证明邮箱归属，和验证码登录一样没注册就注册
     user.password_hash = hash_password(body.new_password)
     user.password_failures = 0
     user.password_locked_until = None

@@ -65,6 +65,7 @@ export function LoginPage() {
     }
   }
 
+  const registerHref = `/register?${new URLSearchParams({ ...(email.trim() && { email: email.trim() }), next })}`
   const forgotHref = `/forgot-password?${new URLSearchParams({ ...(email.trim() && { email: email.trim() }), next })}`
 
   const emailInput = (
@@ -81,11 +82,9 @@ export function LoginPage() {
     <>
       <SiteHeader compact />
       <main className="container auth-wrap">
-        <h1 className="section-title">登录 / 注册</h1>
+        <h1 className="section-title">登录</h1>
         <p className="muted" style={{ margin: '8px 0 24px' }}>
-          {mode === 'code'
-            ? '输入邮箱，收到验证码就能登录。第一次登录会自动注册。'
-            : '在「个人设置」里设过密码的账号，可以直接用密码登录。'}
+          还没有账号？<Link className="inline-link" to={registerHref}>注册一个</Link>
         </p>
 
         <div className="tabs auth-tabs" role="tablist" aria-label="登录方式">
@@ -114,7 +113,11 @@ export function LoginPage() {
         ) : step === 'email' ? (
           <form className="form" onSubmit={sendCode}>
             {emailInput}
-            {error && <p className="form-error" role="alert">{error}</p>}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}{error.includes('还没注册') && <> <Link className="inline-link" to={registerHref}>去注册</Link></>}
+              </p>
+            )}
             <button className="btn btn-primary" disabled={busy || !email.trim()}>{busy ? '发送中…' : '获取验证码'}</button>
           </form>
         ) : (

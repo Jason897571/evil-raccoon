@@ -9,7 +9,7 @@ log = logging.getLogger("uvicorn.error")
 
 def send_login_code(email: str, code: str, purpose: str = "login") -> None:
     """发验证码邮件。没配 SMTP 时只写日志，方便本地开发。"""
-    what = "重设密码验证码" if purpose == "reset" else "登录验证码"
+    what = {"reset": "重设密码验证码", "register": "注册验证码"}.get(purpose, "登录验证码")
     if not settings.smtp_host:
         log.warning("【开发模式】%s 的%s：%s", email, what, code)
         return

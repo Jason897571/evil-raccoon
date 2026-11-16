@@ -33,7 +33,10 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
             <AccountMenu user={user} onLogout={() => void signOut()} />
           </>
         ) : (
-          <Link to="/login">登录</Link>
+          <>
+            <Link to="/login">登录</Link>
+            <Link to="/register" className="nav-register">注册</Link>
+          </>
         ))}
         <span className="socials">
           <XhsLink />

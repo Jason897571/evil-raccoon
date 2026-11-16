@@ -33,7 +33,7 @@ def session_count(user_id: int) -> int:
 
 
 def test_set_password_then_login_with_it(client):
-    login(client)
+    login(client, legacy=True)
     assert client.get("/api/auth/me").json()["user"]["has_password"] is False
     res = client.put("/api/auth/password", json={"new_password": "raccoon-123"})
     assert res.status_code == 200 and res.json()["has_password"] is True
@@ -51,14 +51,14 @@ def test_set_password_then_login_with_it(client):
 def test_password_login_unknown_or_passwordless_account(client):
     res = client.post("/api/auth/password-login", json={"email": "ghost@example.com", "password": "whatever1"})
     assert res.status_code == 400
-    login(client)  # 有账号但没设密码
+    login(client, legacy=True)  # 有账号但没设密码
     client.post("/api/auth/logout")
     res2 = client.post("/api/auth/password-login", json={"email": EMAIL, "password": "whatever1"})
     assert res2.status_code == 400 and res2.json()["detail"] == res.json()["detail"]
 
 
 def test_change_password_needs_current_and_revokes_other_sessions(client):
-    login(client)
+    login(client, legacy=True)
     client.put("/api/auth/password", json={"new_password": "first-pass"})
     assert client.put("/api/auth/password", json={"new_password": "second-pass"}).status_code == 400
     assert client.put("/api/auth/password",
@@ -78,7 +78,7 @@ def test_password_rules(client):
 
 
 def test_lockout_after_repeated_failures(client):
-    login(client)
+    login(client, legacy=True)
     client.put("/api/auth/password", json={"new_password": "right-pass"})
     client.post("/api/auth/logout")
     for _ in range(5):
@@ -91,7 +91,7 @@ def test_lockout_after_repeated_failures(client):
 
 
 def test_forgot_password_resets_with_email_code(client):
-    login(client)
+    login(client, legacy=True)
     client.put("/api/auth/password", json={"new_password": "forgotten-1"})
     user_id = add_other_session()
     client.post("/api/auth/logout")

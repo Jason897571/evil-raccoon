@@ -548,3 +548,6 @@ td > .pill:first-child, td > .pill-btn { margin-left: 0; }
 .support-dialog-body h3 { text-align: center; margin-bottom: 8px; }
 
 .skill-row .grow, .record-list .grow, .user-head .grow { flex: 1; min-width: 0; }
+.inline-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.site-nav .nav-register { padding: 6px 12px; background: var(--accent); color: var(--bg); }
+.site-nav .nav-register:hover { color: var(--bg); filter: brightness(1.08); }

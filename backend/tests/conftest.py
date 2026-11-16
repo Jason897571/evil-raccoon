@@ -11,7 +11,7 @@ settings.smtp_host = None
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine, delete, text  # noqa: E402
+from sqlalchemy import create_engine, delete, select, text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.db import Base, engine  # noqa: E402
@@ -22,6 +22,7 @@ from app.models import (  # noqa: E402
 
 
 ADMIN_EMAIL = "boss@example.com"
+TEST_PASSWORD = "test-pass-1"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -65,10 +66,24 @@ def client():
         yield c
 
 
-def login(client: TestClient, email: str = "fan@example.com") -> None:
-    code = client.post("/api/auth/code", json={"email": email}).json()["dev_code"]
-    res = client.post("/api/auth/login", json={"email": email, "code": code})
-    assert res.status_code == 200, res.text
+def login(client: TestClient, email: str = "fan@example.com", *, legacy: bool = False) -> None:
+    """登录测试账号：没注册过就走注册（密码 TEST_PASSWORD），注册过就用验证码登录。
+
+    legacy=True 先在库里建一个没密码的老账号（上线密码功能之前注册的用户），再用验证码登录。
+    """
+    with Session(engine) as db:
+        exists = db.scalar(select(User.id).where(User.email == email)) is not None
+        if legacy and not exists:
+            db.add(User(email=email))
+            db.commit()
+            exists = True
+    if exists:
+        code = client.post("/api/auth/code", json={"email": email}).json()["dev_code"]
+        res = client.post("/api/auth/login", json={"email": email, "code": code})
+    else:
+        code = client.post("/api/auth/code", json={"email": email, "purpose": "register"}).json()["dev_code"]
+        res = client.post("/api/auth/register", json={"email": email, "code": code, "password": TEST_PASSWORD})
+    assert res.status_code in (200, 201), res.text
 
 
 def login_admin(client: TestClient) -> None:

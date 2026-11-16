@@ -60,7 +60,7 @@ class HomeOut(BaseModel):
 
 class CodeRequest(BaseModel):
     email: EmailStr
-    purpose: Literal["login", "reset"] = "login"  # 只影响邮件标题和正文
+    purpose: Literal["login", "register", "reset"] = "login"  # 注册只给新邮箱发，登录 / 重设只给已注册的邮箱发
 
 
 class CodeSent(BaseModel):
@@ -75,6 +75,13 @@ class LoginRequest(BaseModel):
 
 
 Password = Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
+    password: Password
+    display_name: str | None = Field(default=None, max_length=40)
 
 
 class PasswordLogin(BaseModel):
