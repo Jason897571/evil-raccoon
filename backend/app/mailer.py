@@ -7,17 +7,18 @@ from app.config import settings
 log = logging.getLogger("uvicorn.error")
 
 
-def send_login_code(email: str, code: str) -> None:
+def send_login_code(email: str, code: str, purpose: str = "login") -> None:
     """发验证码邮件。没配 SMTP 时只写日志，方便本地开发。"""
+    what = "重设密码验证码" if purpose == "reset" else "登录验证码"
     if not settings.smtp_host:
-        log.warning("【开发模式】%s 的登录验证码：%s", email, code)
+        log.warning("【开发模式】%s 的%s：%s", email, what, code)
         return
 
     msg = EmailMessage()
-    msg["Subject"] = f"Evil Raccoon 登录验证码：{code}"
+    msg["Subject"] = f"Evil Raccoon {what}：{code}"
     msg["From"] = settings.smtp_from or settings.smtp_user
     msg["To"] = email
-    msg.set_content(f"你的登录验证码是 {code}，10 分钟内有效。\n\n如果不是你本人操作，忽略这封邮件即可。\n\n— Evil Raccoon")
+    msg.set_content(f"你的{what}是 {code}，10 分钟内有效。\n\n如果不是你本人操作，忽略这封邮件即可。\n\n— Evil Raccoon")
 
     with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
         if settings.smtp_user and settings.smtp_password:

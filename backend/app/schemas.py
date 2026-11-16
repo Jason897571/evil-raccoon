@@ -60,6 +60,7 @@ class HomeOut(BaseModel):
 
 class CodeRequest(BaseModel):
     email: EmailStr
+    purpose: Literal["login", "reset"] = "login"  # 只影响邮件标题和正文
 
 
 class CodeSent(BaseModel):
@@ -73,12 +74,32 @@ class LoginRequest(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+Password = Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class PasswordLogin(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
+    new_password: Password
+
+
+class PasswordChange(BaseModel):
+    current_password: str | None = Field(default=None, max_length=128)  # 已经设过密码时必填
+    new_password: Password
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     email: str
     display_name: str | None
     is_admin: bool
+    has_password: bool
     created_at: UtcDatetime
 
 

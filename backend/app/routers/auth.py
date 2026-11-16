@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import delete, func, select
@@ -9,8 +9,10 @@ from app.db import get_session
 from app.deps import SESSION_COOKIE, current_user, optional_user
 from app.mailer import send_login_code
 from app.models import LoginCode, User, UserSession, utcnow
-from app.schemas import CodeRequest, CodeSent, LoginRequest, MeOut, UpdateMe, UserOut
-from app.security import digest, new_login_code, new_session_token, same_digest
+from app.schemas import (
+    CodeRequest, CodeSent, LoginRequest, MeOut, PasswordChange, PasswordLogin, PasswordReset, UpdateMe, UserOut,
+)
+from app.security import digest, hash_password, new_login_code, new_session_token, same_digest, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -18,6 +20,8 @@ RESEND_SECONDS = 60
 CODE_TTL = timedelta(minutes=10)
 MAX_ATTEMPTS = 5
 HOURLY_LIMIT = 10
+PASSWORD_MAX_FAILURES = 5
+PASSWORD_LOCK = timedelta(minutes=15)
 
 
 @router.post("/code", response_model=CodeSent)
@@ -35,7 +39,7 @@ def send_code(body: CodeRequest, db: Session = Depends(get_session)) -> CodeSent
 
     code = new_login_code()
     try:
-        send_login_code(email, code)
+        send_login_code(email, code, body.purpose)
     except Exception as exc:  # SMTP 出错时别把半成品记录留在库里
         raise HTTPException(status_code=502, detail="验证码邮件发送失败，请稍后再试") from exc
 
@@ -45,10 +49,8 @@ def send_code(body: CodeRequest, db: Session = Depends(get_session)) -> CodeSent
     return CodeSent(resend_after=RESEND_SECONDS, dev_code=dev_code)
 
 
-@router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_session)) -> User:
-    email = body.email.lower()
-    now = utcnow()
+def _consume_code(db: Session, email: str, code: str, now: datetime) -> None:
+    """核对邮箱验证码，对了就标记为已用；不对直接抛 400。"""
     record = db.scalar(
         select(LoginCode)
         .where(LoginCode.email == email, LoginCode.used_at.is_(None))
@@ -59,30 +61,94 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_sess
         raise HTTPException(status_code=400, detail="验证码已失效，请重新获取")
     if record.attempts >= MAX_ATTEMPTS:
         raise HTTPException(status_code=400, detail="错误次数太多，请重新获取验证码")
-    if not same_digest(body.code, record.code_hash):
+    if not same_digest(code, record.code_hash):
         record.attempts += 1
         db.commit()
         raise HTTPException(status_code=400, detail="验证码不对，请检查后再试")
-
     record.used_at = now
+
+
+def _get_or_create_user(db: Session, email: str, now: datetime) -> User:
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
         # 管理员只有一个：第一个注册的用户。之后注册的都是普通客户，系统里没有别的途径设管理员。
         is_first = (db.scalar(select(func.count(User.id))) or 0) == 0
         user = User(email=email, created_at=now, is_admin=is_first)
         db.add(user)
-    user.last_login_at = now
-    db.flush()
+        db.flush()
+    return user
 
+
+def _start_session(db: Session, user: User, response: Response, now: datetime) -> None:
+    user.last_login_at = now
     token = new_session_token()
     expires = now + timedelta(days=settings.session_days)
     db.add(UserSession(user_id=user.id, token_hash=digest(token), expires_at=expires, created_at=now))
     db.commit()
-
     response.set_cookie(
         SESSION_COOKIE, token, max_age=settings.session_days * 86400,
         httponly=True, samesite="lax", secure=settings.cookie_secure, path="/",
     )
+
+
+@router.post("/login", response_model=UserOut)
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_session)) -> User:
+    email = body.email.lower()
+    now = utcnow()
+    _consume_code(db, email, body.code, now)
+    user = _get_or_create_user(db, email, now)
+    _start_session(db, user, response, now)
+    return user
+
+
+@router.post("/password-login", response_model=UserOut)
+def password_login(body: PasswordLogin, response: Response, db: Session = Depends(get_session)) -> User:
+    email = body.email.lower()
+    now = utcnow()
+    user = db.scalar(select(User).where(User.email == email))
+    if user and user.password_locked_until and user.password_locked_until > now:
+        minutes = int((user.password_locked_until - now).total_seconds() // 60) + 1
+        raise HTTPException(status_code=429, detail=f"密码错误次数太多，请 {minutes} 分钟后再试，或用验证码登录")
+    if not verify_password(body.password, user.password_hash if user else None):
+        if user and user.password_hash:
+            user.password_failures += 1
+            if user.password_failures >= PASSWORD_MAX_FAILURES:
+                user.password_failures = 0
+                user.password_locked_until = now + PASSWORD_LOCK
+            db.commit()
+        raise HTTPException(status_code=400, detail="邮箱或密码不对。没设过密码的账号请用验证码登录")
+    user.password_failures = 0
+    user.password_locked_until = None
+    _start_session(db, user, response, now)
+    return user
+
+
+@router.post("/password-reset", response_model=UserOut)
+def password_reset(body: PasswordReset, response: Response, db: Session = Depends(get_session)) -> User:
+    """忘记密码：用邮箱验证码设新密码，顺便登录。其他设备上的登录全部失效。"""
+    email = body.email.lower()
+    now = utcnow()
+    _consume_code(db, email, body.code, now)
+    user = _get_or_create_user(db, email, now)  # 验证码已证明邮箱归属，和验证码登录一样没注册就注册
+    user.password_hash = hash_password(body.new_password)
+    user.password_failures = 0
+    user.password_locked_until = None
+    db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    _start_session(db, user, response, now)
+    return user
+
+
+@router.put("/password", response_model=UserOut)
+def change_password(
+    body: PasswordChange, request: Request, user: User = Depends(current_user), db: Session = Depends(get_session),
+) -> User:
+    """个人设置里设置 / 修改密码。已经有密码时要先输对当前密码；改完其他设备上的登录失效。"""
+    if user.password_hash and not verify_password(body.current_password or "", user.password_hash):
+        raise HTTPException(status_code=400, detail="当前密码不对。忘了的话可以用「忘记密码」通过邮箱重设")
+    user.password_hash = hash_password(body.new_password)
+    current = digest(request.cookies.get(SESSION_COOKIE, ""))
+    db.execute(delete(UserSession).where(UserSession.user_id == user.id, UserSession.token_hash != current))
+    db.commit()
     return user
 
 

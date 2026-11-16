@@ -1,13 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { postJson, type CodeSent } from '../api'
 import { useAuth } from '../auth'
 import { SiteHeader } from '../components/SiteHeader'
+import { useCooldown } from '../useCooldown'
 
 /** 只允许站内跳转，防止 ?next= 被拿来跳到外站。 */
-function safeNext(raw: string | null): string {
+export function safeNext(raw: string | null): string {
   return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
 }
+
+type Mode = 'code' | 'password'
 
 export function LoginPage() {
   const [params] = useSearchParams()
@@ -15,21 +18,22 @@ export function LoginPage() {
   const { ready, user, refresh } = useAuth()
   const navigate = useNavigate()
 
+  const [mode, setMode] = useState<Mode>('code')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [devCode, setDevCode] = useState<string | null>(null)
-  const [cooldown, setCooldown] = useState(0)
+  const [cooldown, setCooldown] = useCooldown()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (cooldown <= 0) return
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
-    return () => clearTimeout(t)
-  }, [cooldown])
-
   if (ready && user) return <Navigate to={next} replace />
+
+  const switchMode = (m: Mode) => {
+    setMode(m)
+    setError(null)
+  }
 
   const sendCode = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -47,12 +51,12 @@ export function LoginPage() {
     }
   }
 
-  const login = async (e: FormEvent) => {
+  const submit = (path: string, body: object) => async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      await postJson('/api/auth/login', { email: email.trim(), code: code.trim() })
+      await postJson(path, body)
       await refresh()
       navigate(next, { replace: true })
     } catch (err) {
@@ -61,25 +65,60 @@ export function LoginPage() {
     }
   }
 
+  const forgotHref = `/forgot-password?${new URLSearchParams({ ...(email.trim() && { email: email.trim() }), next })}`
+
+  const emailInput = (
+    <>
+      <label htmlFor="email">邮箱</label>
+      <input
+        id="email" type="email" autoComplete="email" required autoFocus placeholder="you@example.com"
+        value={email} onChange={(e) => setEmail(e.target.value)}
+      />
+    </>
+  )
+
   return (
     <>
       <SiteHeader compact />
       <main className="container auth-wrap">
         <h1 className="section-title">登录 / 注册</h1>
-        <p className="muted" style={{ margin: '8px 0 32px' }}>输入邮箱，收到验证码就能登录。第一次登录会自动注册。</p>
+        <p className="muted" style={{ margin: '8px 0 24px' }}>
+          {mode === 'code'
+            ? '输入邮箱，收到验证码就能登录。第一次登录会自动注册。'
+            : '在「个人设置」里设过密码的账号，可以直接用密码登录。'}
+        </p>
 
-        {step === 'email' ? (
-          <form className="form" onSubmit={sendCode}>
-            <label htmlFor="email">邮箱</label>
+        <div className="tabs auth-tabs" role="tablist" aria-label="登录方式">
+          <button type="button" role="tab" className="tab" aria-selected={mode === 'code'} onClick={() => switchMode('code')}>
+            验证码登录
+          </button>
+          <button type="button" role="tab" className="tab" aria-selected={mode === 'password'} onClick={() => switchMode('password')}>
+            密码登录
+          </button>
+        </div>
+
+        {mode === 'password' ? (
+          <form className="form" onSubmit={submit('/api/auth/password-login', { email: email.trim(), password })}>
+            {emailInput}
+            <div className="form-row">
+              <label htmlFor="password">密码</label>
+              <Link className="text-link" to={forgotHref}>忘记密码？</Link>
+            </div>
             <input
-              id="email" type="email" autoComplete="email" required autoFocus placeholder="you@example.com"
-              value={email} onChange={(e) => setEmail(e.target.value)}
+              id="password" type="password" autoComplete="current-password" required
+              value={password} onChange={(e) => setPassword(e.target.value)}
             />
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <button className="btn btn-primary" disabled={busy || !email.trim() || !password}>{busy ? '登录中…' : '登录'}</button>
+          </form>
+        ) : step === 'email' ? (
+          <form className="form" onSubmit={sendCode}>
+            {emailInput}
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="btn btn-primary" disabled={busy || !email.trim()}>{busy ? '发送中…' : '获取验证码'}</button>
           </form>
         ) : (
-          <form className="form" onSubmit={login}>
+          <form className="form" onSubmit={submit('/api/auth/login', { email: email.trim(), code: code.trim() })}>
             <p className="muted" style={{ margin: 0 }}>
               验证码已发到 <b style={{ color: 'var(--text)' }}>{email}</b>，10 分钟内有效。
               <button type="button" className="text-btn" onClick={() => { setStep('email'); setCode(''); setError(null) }}>换个邮箱</button>

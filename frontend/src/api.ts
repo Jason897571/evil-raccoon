@@ -33,7 +33,7 @@ export type Home = {
   elements: string[]
 }
 
-export type User = { email: string; display_name: string | null; is_admin: boolean; created_at: string }
+export type User = { email: string; display_name: string | null; is_admin: boolean; has_password: boolean; created_at: string }
 export type Me = { user: User | null; dev_tools: boolean }
 export type CodeSent = { sent: boolean; resend_after: number; dev_code: string | null }
 
@@ -129,6 +129,7 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const postJson = <T>(path: string, body?: unknown) => send<T>('POST', path, body)
 export const patchJson = <T>(path: string, body: unknown) => send<T>('PATCH', path, body)
+export const putJson = <T>(path: string, body: unknown) => send<T>('PUT', path, body)
 export const deleteJson = <T = void>(path: string) => send<T>('DELETE', path)
 
 export const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`

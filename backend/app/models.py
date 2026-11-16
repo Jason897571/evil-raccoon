@@ -65,9 +65,16 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     display_name: Mapped[str | None] = mapped_column(String(40))  # 昵称，个人设置里改
+    password_hash: Mapped[str | None] = mapped_column(String(255))  # 可选：没设密码的账号只能用验证码登录
+    password_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    password_locked_until: Mapped[datetime | None] = mapped_column(DateTime)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash)
 
 
 class LoginCode(Base):
