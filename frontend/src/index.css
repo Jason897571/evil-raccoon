@@ -300,8 +300,63 @@ img { display: block; max-width: 100%; }
 .text-btn:hover { color: var(--accent); }
 .text-btn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 
-.site-nav .account { display: flex; align-items: center; gap: 4px; font-weight: 400; color: var(--text-3); font-size: 13px; }
-.site-nav .account .email { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---------- 账号下拉菜单 ---------- */
+.account-menu { position: relative; }
+.account-trigger {
+  display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 4px; cursor: pointer;
+  background: var(--btn); color: var(--text); border: 2px solid var(--btn-line);
+  font: inherit; font-size: 13px; font-weight: 700;
+}
+.account-trigger:hover, .account-trigger[aria-expanded="true"] { border-color: var(--accent); }
+.account-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-avatar {
+  width: 26px; height: 26px; display: grid; place-items: center; flex: none;
+  background: var(--accent); color: var(--bg); font-family: var(--mono); font-size: 13px;
+}
+.account-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-caret { color: var(--text-3); font-size: 11px; }
+.account-dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 50; min-width: 200px; padding: 6px;
+  background: var(--tile); border: 2px solid var(--btn-line); box-shadow: 6px 6px 0 var(--shadow);
+}
+.account-label {
+  padding: 8px 10px; font-size: 12px; font-weight: 400; color: var(--muted);
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.account-sep { height: 2px; margin: 4px 0; background: var(--line); }
+.account-item {
+  display: block; width: 100%; padding: 10px; text-align: left; cursor: pointer;
+  background: none; border: 0; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700;
+}
+.account-item:hover, .account-item:focus-visible { background: var(--btn); color: var(--text); outline: none; }
+.account-item.accent { color: var(--accent); }
+.account-item.danger { color: var(--bad); }
+@media (max-width: 640px) {
+  .account-name { display: none; }
+  .account-trigger { padding-right: 8px; }
+  .account-dropdown { left: 0; right: auto; } /* 窄屏时按钮换行到左边，菜单往右展开免得出屏 */
+}
+
+/* ---------- 小红书标志 ---------- */
+.xhs-link { display: inline-flex; align-items: center; text-decoration: none; }
+.xhs-logo {
+  display: inline-block; background: #ff2442; color: #fff; font-family: var(--sans); font-weight: 900;
+  letter-spacing: 0.04em; line-height: 1; border-radius: 4px;
+}
+.xhs-sm .xhs-logo { font-size: 11px; padding: 4px 6px; }
+.xhs-md .xhs-logo { font-size: 13px; padding: 5px 8px; }
+.xhs-link:hover .xhs-logo { filter: brightness(1.12); }
+.site-nav .socials { align-items: center; }
+
+/* ---------- 个人设置 ---------- */
+.settings-card { display: flex; flex-direction: column; gap: 20px; max-width: 560px; }
+.settings-card + .settings-card { margin-top: 24px; }
+.settings-card h2 { margin: 0; font-size: 24px; }
+.settings-card p { margin: 0; color: var(--text-3); font-size: 14px; line-height: 1.7; }
+.settings-card .hint { font-size: 12px; color: var(--muted); }
+.settings-card .field input:disabled { color: var(--text-3); cursor: not-allowed; }
+.settings-meta { font-size: 13px; }
+.settings-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 .order-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
 .status { font-family: var(--pixel); font-size: 12px; padding: 6px 10px; white-space: nowrap; }
@@ -337,7 +392,6 @@ img { display: block; max-width: 100%; }
   .hero-avatar { width: 64px; height: 64px; }
 }
 .plan + .plan { margin-top: 16px; }
-.site-nav .admin-link { color: var(--accent); }
 
 /* ---------- 管理后台 ---------- */
 .admin { padding-top: 48px; padding-bottom: 112px; }

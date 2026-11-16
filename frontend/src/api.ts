@@ -33,7 +33,7 @@ export type Home = {
   elements: string[]
 }
 
-export type User = { email: string; is_admin: boolean }
+export type User = { email: string; display_name: string | null; is_admin: boolean; created_at: string }
 export type Me = { user: User | null; dev_tools: boolean }
 export type CodeSent = { sent: boolean; resend_after: number; dev_code: string | null }
 
@@ -141,5 +141,5 @@ export const formatTime = (iso: string) =>
 
 export const STATUS_LABEL: Record<OrderStatus, string> = { pending: '待付款', paid: '已付款', cancelled: '已取消' }
 
-export const AFDIAN_URL = 'https://afdian.com/a/evil_raccoon'
+export const XHS_URL = 'https://www.xiaohongshu.com/user/profile/5c22a55b00000000070253bb'
 export const ITCH_URL = 'https://evil-raccoon.itch.io'

@@ -12,7 +12,7 @@ def make_token(client) -> str:
 
 def test_me_reports_role(client):
     login(client)
-    assert client.get("/api/auth/me").json()["user"] == {"email": "fan@example.com", "is_admin": False}
+    assert client.get("/api/auth/me").json()["user"]["is_admin"] is False
 
 
 def test_admin_endpoints_reject_customers_and_anonymous(client):

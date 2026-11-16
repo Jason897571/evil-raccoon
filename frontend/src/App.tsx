@@ -11,6 +11,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { OrderPage } from './pages/OrderPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { PackPage } from './pages/PackPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminTiersPage } from './pages/admin/AdminTiersPage'
 import { AdminSupportersPage } from './pages/admin/AdminSupportersPage'
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
             <Route path="/orders/:orderNo" element={<RequireAuth><OrderPage /></RequireAuth>} />
             <Route path="/library" element={<RequireAuth><LibraryPage /></RequireAuth>} />
+            <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
               <Route index element={<Navigate to="tiers" replace />} />
               <Route path="tiers" element={<AdminTiersPage />} />

@@ -1,16 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { AFDIAN_URL, ITCH_URL } from '../api'
+import { ITCH_URL } from '../api'
 import { useAuth } from '../auth'
 import { useCart } from '../cart'
+import { AccountMenu } from './AccountMenu'
+import { XhsLink } from './XhsLogo'
 
 export function SiteHeader({ compact = false }: { compact?: boolean }) {
   const { items } = useCart()
   const { ready, user, logout } = useAuth()
   const navigate = useNavigate()
 
+  // 先离开当前页再退出：不然在「我的订单」这类页面会先被踢到登录页
   const signOut = async () => {
-    await logout()
     navigate('/')
+    await logout()
   }
 
   return (
@@ -27,18 +30,13 @@ export function SiteHeader({ compact = false }: { compact?: boolean }) {
         {ready && (user ? (
           <>
             <Link to="/library">我的素材</Link>
-            <Link to="/orders">订单</Link>
-            {user.is_admin && <Link to="/admin" className="admin-link">管理</Link>}
-            <span className="account">
-              <span className="email" title={user.email}>{user.email}</span>
-              <button className="text-btn" onClick={() => void signOut()}>退出</button>
-            </span>
+            <AccountMenu user={user} onLogout={() => void signOut()} />
           </>
         ) : (
           <Link to="/login">登录</Link>
         ))}
         <span className="socials">
-          <a href={AFDIAN_URL} target="_blank" rel="noreferrer">爱发电</a>·
+          <XhsLink />
           <a href={ITCH_URL} target="_blank" rel="noreferrer">itch</a>
         </span>
       </nav>

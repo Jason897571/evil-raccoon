@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AFDIAN_URL, formatTime, type LibraryItem } from '../api'
+import { XHS_URL, formatTime, type LibraryItem } from '../api'
 import { SiteHeader } from '../components/SiteHeader'
 import { useApi } from '../useApi'
 
@@ -65,7 +65,7 @@ function LibraryRow({ item }: { item: LibraryItem }) {
         </div>
       ) : (
         <span className="muted" style={{ fontSize: 13, maxWidth: 220 }}>
-          下载链接准备中，可以在 <a href={AFDIAN_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>爱发电</a> 私信我
+          下载链接准备中，可以在 <a href={XHS_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>小红书</a> 私信我
         </span>
       )}
     </li>

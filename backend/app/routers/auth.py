@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_session
-from app.deps import SESSION_COOKIE, optional_user
+from app.deps import SESSION_COOKIE, current_user, optional_user
 from app.mailer import send_login_code
 from app.models import LoginCode, User, UserSession, utcnow
-from app.schemas import CodeRequest, CodeSent, LoginRequest, MeOut, UserOut
+from app.schemas import CodeRequest, CodeSent, LoginRequest, MeOut, UpdateMe, UserOut
 from app.security import digest, new_login_code, new_session_token, same_digest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -98,3 +98,21 @@ def logout(request: Request, response: Response, db: Session = Depends(get_sessi
 @router.get("/me", response_model=MeOut)
 def me(user: User | None = Depends(optional_user)) -> MeOut:
     return MeOut(user=UserOut.model_validate(user) if user else None, dev_tools=settings.is_dev)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(body: UpdateMe, user: User = Depends(current_user), db: Session = Depends(get_session)) -> User:
+    user.display_name = (body.display_name or "").strip() or None  # 留空 = 清除昵称
+    db.commit()
+    return user
+
+
+@router.post("/logout-others")
+def logout_others(request: Request, user: User = Depends(current_user), db: Session = Depends(get_session)) -> dict:
+    """退出这个账号在其他浏览器 / 设备上的登录，保留当前这一个。"""
+    current = digest(request.cookies.get(SESSION_COOKIE, ""))
+    result = db.execute(
+        delete(UserSession).where(UserSession.user_id == user.id, UserSession.token_hash != current)
+    )
+    db.commit()
+    return {"revoked": result.rowcount}

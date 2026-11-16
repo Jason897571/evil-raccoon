@@ -1,10 +1,10 @@
 from datetime import timedelta
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db import engine
-from app.models import LoginCode, User
+from app.models import LoginCode, User, UserSession, utcnow
 from tests.conftest import login
 
 
@@ -17,11 +17,12 @@ def test_login_with_code_sets_session(client):
     assert client.get("/api/auth/me").json()["user"] is None
     res = client.post("/api/auth/login", json={"email": "fan@example.com", "code": code})
     assert res.status_code == 200
-    assert res.json() == {"email": "fan@example.com", "is_admin": False}
+    assert res.json()["email"] == "fan@example.com" and res.json()["is_admin"] is False
     assert "er_session" in res.cookies
 
     me = client.get("/api/auth/me").json()
-    assert me["user"] == {"email": "fan@example.com", "is_admin": False}
+    assert me["user"]["email"] == "fan@example.com" and me["user"]["is_admin"] is False
+    assert me["user"]["display_name"] is None
     assert me["dev_tools"] is True
 
 
@@ -87,3 +88,29 @@ def test_only_first_registered_user_is_admin(client):
     # 全库只有一个管理员，就是第一个注册的
     with Session(engine) as db:
         assert db.scalars(select(User.email).where(User.is_admin.is_(True))).all() == ["first@example.com"]
+
+
+def test_update_display_name(client):
+    assert client.patch("/api/auth/me", json={"display_name": "x"}).status_code == 401
+    login(client)
+    res = client.patch("/api/auth/me", json={"display_name": "  小浣熊  "})
+    assert res.status_code == 200
+    assert res.json()["display_name"] == "小浣熊"
+    assert client.get("/api/auth/me").json()["user"]["display_name"] == "小浣熊"
+    assert client.patch("/api/auth/me", json={"display_name": ""}).json()["display_name"] is None
+    assert client.patch("/api/auth/me", json={"display_name": "长" * 41}).status_code == 422
+
+
+def test_logout_others_keeps_current_session(client):
+    login(client)
+    with Session(engine) as db:
+        user = db.scalar(select(User).where(User.email == "fan@example.com"))
+        db.add(UserSession(user_id=user.id, token_hash="other-device", expires_at=utcnow() + timedelta(days=1),
+                           created_at=utcnow()))
+        db.commit()
+        user_id = user.id
+    res = client.post("/api/auth/logout-others")
+    assert res.json() == {"revoked": 1}
+    assert client.get("/api/auth/me").json()["user"]["email"] == "fan@example.com"
+    with Session(engine) as db:
+        assert db.scalar(select(func.count(UserSession.id)).where(UserSession.user_id == user_id)) == 1

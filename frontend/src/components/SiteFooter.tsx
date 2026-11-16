@@ -1,4 +1,5 @@
-import { AFDIAN_URL, ITCH_URL } from '../api'
+import { ITCH_URL } from '../api'
+import { XhsLink } from './XhsLogo'
 
 const YEAR = new Date().getFullYear()
 
@@ -11,7 +12,7 @@ export function SiteFooter() {
           <span className="muted" style={{ fontSize: 12 }}>© {YEAR} Evil Raccoon</span>
         </div>
         <div className="links">
-          <a href={AFDIAN_URL} target="_blank" rel="noreferrer">爱发电</a>
+          <XhsLink size="md" />
           <a href={ITCH_URL} target="_blank" rel="noreferrer">itch.io</a>
         </div>
       </div>

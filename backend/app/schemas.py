@@ -77,7 +77,13 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     email: str
+    display_name: str | None
     is_admin: bool
+    created_at: UtcDatetime
+
+
+class UpdateMe(BaseModel):
+    display_name: str | None = Field(default=None, max_length=40)
 
 
 class MeOut(BaseModel):

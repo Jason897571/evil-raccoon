@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { formatShortPrice, postJson, type PayStart, type SupportInfo, type Tier } from '../api'
+import { useAuth } from '../auth'
 
 /** 首页「每月发电」：选档位或自定义金额，跳到支付宝付款。 */
 export function SupportSection({ info }: { info: SupportInfo | null }) {
@@ -49,8 +50,9 @@ export function SupportSection({ info }: { info: SupportInfo | null }) {
 
 function SupportDialog({ tier, onClose }: { tier: Tier | null; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const { user } = useAuth()
   const [amount, setAmount] = useState(tier ? '' : '10')
-  const [name, setName] = useState('')
+  const [name, setName] = useState(user?.display_name ?? '')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
