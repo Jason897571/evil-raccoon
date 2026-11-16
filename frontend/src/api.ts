@@ -132,6 +132,14 @@ export const patchJson = <T>(path: string, body: unknown) => send<T>('PATCH', pa
 export const putJson = <T>(path: string, body: unknown) => send<T>('PUT', path, body)
 export const deleteJson = <T = void>(path: string) => send<T>('DELETE', path)
 
+/** 管理后台上传图片，返回 /media/... 地址。 */
+export async function uploadImage(file: File): Promise<string> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/admin/uploads', { method: 'POST', body: form })
+  return (await handle<{ url: string }>(res, '/api/admin/uploads')).url
+}
+
 export const formatPrice = (cents: number) => `¥${(cents / 100).toFixed(2)}`
 
 /** 整数金额去掉 .00：¥5、¥19.90 */
@@ -144,3 +152,61 @@ export const STATUS_LABEL: Record<OrderStatus, string> = { pending: '待付款',
 
 export const XHS_URL = 'https://www.xiaohongshu.com/user/profile/5c22a55b00000000070253bb'
 export const ITCH_URL = 'https://evil-raccoon.itch.io'
+
+// ---------- 管理后台 ----------
+
+export type AdminSkill = {
+  code: string
+  sort_order: number
+  name: string
+  description: string
+  phases: string
+  preview_gif_url: string
+  sheet_url: string
+  sheet_cols: number
+  sheet_rows: number
+}
+
+export type AdminPack = {
+  slug: string
+  name: string
+  element: string
+  price_cents: number
+  summary: string
+  cover_url: string
+  sort_order: number
+  is_new: boolean
+  is_published: boolean
+  netdisk_url: string | null
+  netdisk_code: string | null
+  created_at: string
+  skill_count: number
+  sold_count: number
+  skills: AdminSkill[]
+}
+
+export type AdminUserRow = {
+  id: number
+  email: string
+  display_name: string | null
+  is_admin: boolean
+  has_password: boolean
+  created_at: string
+  last_login_at: string | null
+  paid_order_count: number
+  paid_cents: number
+  support_cents: number
+}
+
+export type AdminUserDetail = {
+  user: AdminUserRow
+  password_locked_until: string | null
+  password_failures: number
+  session_count: number
+  last_session_at: string | null
+  pending_order_count: number
+  support_count: number
+  orders: Order[]
+  owned: { slug: string; name: string; cover_url: string; order_no: string; paid_at: string | null }[]
+  support_payments: SupportPayment[]
+}

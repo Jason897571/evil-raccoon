@@ -37,7 +37,7 @@ def home(db: Session = Depends(get_session)) -> HomeOut:
         for label, code in HERO_TILES
     ]
     present = {p.element for p in packs}
-    elements = [e for e in ELEMENT_ORDER if e in present]
+    elements = [e for e in ELEMENT_ORDER if e in present] + sorted(present - set(ELEMENT_ORDER))
     skill_total = db.scalar(select(func.count(Skill.id)).join(Pack).where(Pack.is_published.is_(True))) or 0
     return HomeOut(hero=hero, stats=Stats(packs=len(packs), skills=skill_total, elements=len(elements)), elements=elements)
 

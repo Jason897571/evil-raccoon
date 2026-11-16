@@ -14,6 +14,10 @@ import { OrdersPage } from './pages/OrdersPage'
 import { PackPage } from './pages/PackPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminPackEditPage } from './pages/admin/AdminPackEditPage'
+import { AdminPacksPage } from './pages/admin/AdminPacksPage'
+import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage'
+import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminTiersPage } from './pages/admin/AdminTiersPage'
 import { AdminSupportersPage } from './pages/admin/AdminSupportersPage'
 import { AdminTokensPage } from './pages/admin/AdminTokensPage'
@@ -45,7 +49,12 @@ export default function App() {
             <Route path="/library" element={<RequireAuth><LibraryPage /></RequireAuth>} />
             <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
-              <Route index element={<Navigate to="tiers" replace />} />
+              <Route index element={<Navigate to="packs" replace />} />
+              <Route path="packs" element={<AdminPacksPage />} />
+              <Route path="packs/new" element={<AdminPackEditPage />} />
+              <Route path="packs/:slug" element={<AdminPackEditPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="users/:id" element={<AdminUserDetailPage />} />
               <Route path="tiers" element={<AdminTiersPage />} />
               <Route path="supporters" element={<AdminSupportersPage />} />
               <Route path="tokens" element={<AdminTokensPage />} />

@@ -235,9 +235,14 @@ class AdminSkill(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     code: str
+    sort_order: int
     name: str
     description: str
     phases: str
+    preview_gif_url: str
+    sheet_url: str
+    sheet_cols: int
+    sheet_rows: int
 
 
 class AdminPack(BaseModel):
@@ -254,7 +259,29 @@ class AdminPack(BaseModel):
     is_published: bool
     netdisk_url: str | None
     netdisk_code: str | None
+    created_at: UtcDatetime
+    skill_count: int = 0
+    sold_count: int = 0  # 已付款订单里出现的次数
     skills: list[AdminSkill]
+
+
+MediaUrl = Annotated[str, Field(max_length=255)]
+Slug = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")]
+SkillCode = Annotated[str, Field(min_length=1, max_length=96, pattern=r"^[a-z0-9][a-z0-9_-]*$")]
+
+
+class PackCreate(BaseModel):
+    slug: Slug
+    name: str = Field(min_length=1, max_length=64)
+    element: str = Field(min_length=1, max_length=16)
+    price_cents: int = Field(ge=0, le=10_000_000)
+    summary: str = Field(default="", max_length=5000)
+    cover_url: MediaUrl = ""
+    sort_order: int = 0
+    is_new: bool = False
+    is_published: bool = False  # 新建默认不上架，内容齐了再上
+    netdisk_url: str | None = Field(default=None, max_length=512)
+    netdisk_code: str | None = Field(default=None, max_length=32)
 
 
 class PackPatch(BaseModel):
@@ -262,6 +289,7 @@ class PackPatch(BaseModel):
     element: str | None = Field(default=None, min_length=1, max_length=16)
     price_cents: int | None = Field(default=None, ge=0, le=10_000_000)
     summary: str | None = Field(default=None, max_length=5000)
+    cover_url: MediaUrl | None = None
     sort_order: int | None = None
     is_new: bool | None = None
     is_published: bool | None = None
@@ -269,7 +297,63 @@ class PackPatch(BaseModel):
     netdisk_code: str | None = Field(default=None, max_length=32)
 
 
+class SkillCreate(BaseModel):
+    code: SkillCode
+    name: str = Field(min_length=1, max_length=64)
+    description: str = Field(default="", max_length=5000)
+    phases: str = Field(default="", max_length=2000)
+    preview_gif_url: MediaUrl = ""
+    sheet_url: MediaUrl = ""
+    sheet_cols: int = Field(default=1, ge=1, le=200)
+    sheet_rows: int = Field(default=1, ge=1, le=200)
+
+
 class SkillPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
     description: str | None = Field(default=None, max_length=5000)
     phases: str | None = Field(default=None, max_length=2000)
+    preview_gif_url: MediaUrl | None = None
+    sheet_url: MediaUrl | None = None
+    sheet_cols: int | None = Field(default=None, ge=1, le=200)
+    sheet_rows: int | None = Field(default=None, ge=1, le=200)
+    sort_order: int | None = None
+
+
+class UploadOut(BaseModel):
+    url: str
+
+
+# ---------- 管理：用户 ----------
+
+class AdminUserRow(BaseModel):
+    id: int
+    email: str
+    display_name: str | None
+    is_admin: bool
+    has_password: bool
+    created_at: UtcDatetime
+    last_login_at: UtcDatetime | None
+    paid_order_count: int
+    paid_cents: int
+    support_cents: int
+
+
+class AdminOwnedPack(BaseModel):
+    slug: str
+    name: str
+    cover_url: str
+    order_no: str
+    paid_at: UtcDatetime | None
+
+
+class AdminUserDetail(BaseModel):
+    user: AdminUserRow
+    password_locked_until: UtcDatetime | None
+    password_failures: int
+    session_count: int  # 还有效的登录会话
+    last_session_at: UtcDatetime | None
+    pending_order_count: int
+    support_count: int
+    orders: list[OrderOut]
+    owned: list[AdminOwnedPack]
+    support_payments: list[SupportPaymentOut]

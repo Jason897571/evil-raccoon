@@ -1,22 +1,28 @@
 """管理接口。
 
-- 特效包、充电档位：登录的管理员或 API token 都能调（Authorization: Bearer <token>）。
+- 特效包（含技能、上传图片）、充电档位：登录的管理员或 API token 都能调（Authorization: Bearer <token>）。
+- 用户资料：只有登录的管理员能看，token 不行。
 - token 本身的创建 / 吊销：只能由登录的管理员在后台操作，token 不能再生 token。
 """
 
 import secrets
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import settings
 from app.db import get_session
 from app.deps import AdminActor, admin_actor, admin_user
-from app.models import ApiToken, Pack, Skill, SupportPayment, SupportTier, User, utcnow
+from app.models import (
+    ApiToken, Order, OrderItem, Pack, Skill, SupportPayment, SupportTier, User, UserSession, utcnow,
+)
+from app.routers.orders import order_out
 from app.schemas import (
-    AdminPack, AdminSkill, PackPatch, SkillPatch, SupportPaymentOut, TierIn, TierOut, TierPatch, TokenCreate,
-    TokenCreated, TokenOut,
+    AdminOwnedPack, AdminPack, AdminSkill, AdminUserDetail, AdminUserRow, PackCreate, PackPatch, SkillCreate,
+    SkillPatch, SupportPaymentOut, TierIn, TierOut, TierPatch, TokenCreate, TokenCreated, TokenOut, UploadOut,
 )
 from app.security import digest
 
@@ -46,37 +52,226 @@ def get_pack(db: Session, slug: str) -> Pack:
     return pack
 
 
+def sold_counts(db: Session) -> dict[int, int]:
+    rows = db.execute(
+        select(OrderItem.pack_id, func.count(OrderItem.id))
+        .join(Order, OrderItem.order_id == Order.id)
+        .where(Order.status == "paid")
+        .group_by(OrderItem.pack_id)
+    )
+    return {pack_id: n for pack_id, n in rows}
+
+
+def to_admin_pack(pack: Pack, sold: dict[int, int]) -> AdminPack:
+    out = AdminPack.model_validate(pack)
+    out.skill_count = len(pack.skills)
+    out.sold_count = sold.get(pack.id, 0)
+    return out
+
+
 @router.get("/packs", response_model=list[AdminPack])
-def list_packs(_: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> list[Pack]:
-    return list(db.scalars(select(Pack).options(selectinload(Pack.skills)).order_by(Pack.sort_order)))
+def list_packs(_: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> list[AdminPack]:
+    sold = sold_counts(db)
+    packs = db.scalars(select(Pack).options(selectinload(Pack.skills)).order_by(Pack.sort_order, Pack.id))
+    return [to_admin_pack(p, sold) for p in packs]
 
 
 @router.get("/packs/{slug}", response_model=AdminPack)
-def read_pack(slug: str, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> Pack:
-    return get_pack(db, slug)
+def read_pack(slug: str, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> AdminPack:
+    return to_admin_pack(get_pack(db, slug), sold_counts(db))
+
+
+@router.post("/packs", response_model=AdminPack, status_code=201)
+def create_pack(body: PackCreate, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> AdminPack:
+    if db.scalar(select(Pack.id).where(Pack.slug == body.slug)):
+        raise HTTPException(status_code=409, detail=f"slug「{body.slug}」已经被用了")
+    data = body.model_dump()
+    for key in NULLABLE_PACK:
+        data[key] = (data[key] or "").strip() or None
+    db.add(Pack(**data, source_dir=""))
+    db.commit()
+    return to_admin_pack(get_pack(db, body.slug), {})
 
 
 @router.patch("/packs/{slug}", response_model=AdminPack)
 def update_pack(
     slug: str, body: PackPatch, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
-) -> Pack:
+) -> AdminPack:
     pack = get_pack(db, slug)
     apply_patch(pack, body, NULLABLE_PACK)
     db.commit()
-    return get_pack(db, slug)
+    return to_admin_pack(get_pack(db, slug), sold_counts(db))
+
+
+@router.delete("/packs/{slug}", status_code=204)
+def delete_pack(slug: str, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)) -> None:
+    pack = get_pack(db, slug)
+    orders = db.scalar(select(func.count(OrderItem.id)).where(OrderItem.pack_id == pack.id)) or 0
+    if orders:
+        # 订单里存着这个包，删了买家的「我的素材」就没了；只能下架
+        raise HTTPException(status_code=409, detail=f"已经有 {orders} 笔订单买过这个包，不能删除，可以改成下架")
+    db.delete(pack)
+    db.commit()
+
+
+def get_skill(pack: Pack, code: str) -> Skill:
+    skill = next((s for s in pack.skills if s.code == code), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail="技能不存在")
+    return skill
+
+
+@router.post("/packs/{slug}/skills", response_model=AdminSkill, status_code=201)
+def create_skill(
+    slug: str, body: SkillCreate, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
+) -> Skill:
+    pack = get_pack(db, slug)
+    if any(s.code == body.code for s in pack.skills):
+        raise HTTPException(status_code=409, detail=f"这个包里已经有技能「{body.code}」")
+    skill = Skill(**body.model_dump(), sort_order=max((s.sort_order for s in pack.skills), default=0) + 1)
+    pack.skills.append(skill)
+    db.commit()
+    return skill
 
 
 @router.patch("/packs/{slug}/skills/{code}", response_model=AdminSkill)
 def update_skill(
     slug: str, code: str, body: SkillPatch, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
 ) -> Skill:
-    pack = get_pack(db, slug)
-    skill = next((s for s in pack.skills if s.code == code), None)
-    if skill is None:
-        raise HTTPException(status_code=404, detail="技能不存在")
+    skill = get_skill(get_pack(db, slug), code)
     apply_patch(skill, body, set())
     db.commit()
     return skill
+
+
+@router.delete("/packs/{slug}/skills/{code}", status_code=204)
+def delete_skill(
+    slug: str, code: str, _: AdminActor = Depends(admin_actor), db: Session = Depends(get_session)
+) -> None:
+    pack = get_pack(db, slug)
+    pack.skills.remove(get_skill(pack, code))
+    db.commit()
+
+
+# ---------- 上传图片 ----------
+
+MAX_UPLOAD = 5 * 1024 * 1024
+IMAGE_TYPES = {b"\x89PNG": "png", b"GIF8": "gif", b"\xff\xd8\xff": "jpg"}
+
+
+def image_ext(head: bytes) -> str | None:
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "webp"
+    return next((ext for magic, ext in IMAGE_TYPES.items() if head.startswith(magic)), None)
+
+
+@router.post("/uploads", response_model=UploadOut, status_code=201)
+async def upload_image(file: UploadFile, _: AdminActor = Depends(admin_actor)) -> UploadOut:
+    """封面、技能 GIF、精灵图都走这里，存到 media/uploads/年月/ 下，返回 /media/... 地址。"""
+    data = await file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(status_code=413, detail="图片不能超过 5MB")
+    ext = image_ext(data[:12])
+    if ext is None:
+        raise HTTPException(status_code=415, detail="只支持 PNG、GIF、JPG、WebP 图片")
+    sub = Path("uploads") / utcnow().strftime("%Y%m")
+    (settings.media_dir / sub).mkdir(parents=True, exist_ok=True)
+    name = f"{secrets.token_hex(8)}.{ext}"
+    (settings.media_dir / sub / name).write_bytes(data)
+    return UploadOut(url=f"/media/{sub.as_posix()}/{name}")
+
+
+# ---------- 用户（只给登录的管理员看，API token 不能读用户资料） ----------
+
+def user_rows(db: Session, users: list[User]) -> list[AdminUserRow]:
+    ids = [u.id for u in users]
+    if not ids:
+        return []
+    paid = {uid: (n, total) for uid, n, total in db.execute(
+        select(Order.user_id, func.count(Order.id), func.coalesce(func.sum(Order.total_cents), 0))
+        .where(Order.user_id.in_(ids), Order.status == "paid")
+        .group_by(Order.user_id)
+    )}
+    support = {uid: total for uid, total in db.execute(
+        select(SupportPayment.user_id, func.coalesce(func.sum(SupportPayment.amount_cents), 0))
+        .where(SupportPayment.user_id.in_(ids), SupportPayment.status == "paid")
+        .group_by(SupportPayment.user_id)
+    )}
+    return [
+        AdminUserRow(
+            id=u.id, email=u.email, display_name=u.display_name, is_admin=u.is_admin, has_password=u.has_password,
+            created_at=u.created_at, last_login_at=u.last_login_at,
+            paid_order_count=paid.get(u.id, (0, 0))[0], paid_cents=int(paid.get(u.id, (0, 0))[1]),
+            support_cents=int(support.get(u.id, 0)),
+        )
+        for u in users
+    ]
+
+
+def get_user(db: Session, user_id: int) -> User:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return user
+
+
+@router.get("/users", response_model=list[AdminUserRow])
+def list_users(
+    q: str | None = None, _: User = Depends(admin_user), db: Session = Depends(get_session)
+) -> list[AdminUserRow]:
+    stmt = select(User).order_by(User.created_at.desc()).limit(500)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(User.email.like(like) | User.display_name.like(like))
+    return user_rows(db, list(db.scalars(stmt)))
+
+
+@router.get("/users/{user_id}", response_model=AdminUserDetail)
+def read_user(user_id: int, _: User = Depends(admin_user), db: Session = Depends(get_session)) -> AdminUserDetail:
+    user = get_user(db, user_id)
+    now = utcnow()
+    orders = list(db.scalars(
+        select(Order).options(selectinload(Order.items).selectinload(OrderItem.pack))
+        .where(Order.user_id == user.id).order_by(Order.created_at.desc())
+    ))
+    owned: list[AdminOwnedPack] = []
+    seen: set[int] = set()
+    for order in sorted((o for o in orders if o.status == "paid"), key=lambda o: o.paid_at or o.created_at, reverse=True):
+        for item in order.items:
+            if item.pack_id not in seen:
+                seen.add(item.pack_id)
+                owned.append(AdminOwnedPack(slug=item.pack.slug, name=item.pack.name, cover_url=item.pack.cover_url,
+                                            order_no=order.order_no, paid_at=order.paid_at))
+    payments = list(db.scalars(
+        select(SupportPayment).where(SupportPayment.user_id == user.id).order_by(SupportPayment.created_at.desc())
+    ))
+    sessions = list(db.scalars(
+        select(UserSession).where(UserSession.user_id == user.id, UserSession.expires_at > now)
+    ))
+    locked = user.password_locked_until if user.password_locked_until and user.password_locked_until > now else None
+    return AdminUserDetail(
+        user=user_rows(db, [user])[0],
+        password_locked_until=locked,
+        password_failures=user.password_failures,
+        session_count=len(sessions),
+        last_session_at=max((s.created_at for s in sessions), default=None),
+        pending_order_count=sum(o.status == "pending" for o in orders),
+        support_count=sum(p.status == "paid" for p in payments),
+        orders=[order_out(o) for o in orders],
+        owned=owned,
+        support_payments=[SupportPaymentOut.model_validate(p) for p in payments],
+    )
+
+
+@router.post("/users/{user_id}/logout-all")
+def logout_user(user_id: int, me: User = Depends(admin_user), db: Session = Depends(get_session)) -> dict:
+    """强制下线：删掉这个用户所有登录会话。管理员自己请用个人设置里的「退出其他设备」。"""
+    user = get_user(db, user_id)
+    if user.id == me.id:
+        raise HTTPException(status_code=400, detail="不能对自己用，请在个人设置里退出其他设备")
+    result = db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    db.commit()
+    return {"revoked": result.rowcount}
 
 
 # ---------- 充电档位 ----------
