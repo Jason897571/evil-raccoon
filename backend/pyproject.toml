@@ -1,0 +1,22 @@
+[project]
+name = "evil-raccoon-backend"
+version = "0.1.0"
+description = "Evil Raccoon 像素特效商城后端"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.1",
+    "cryptography>=50.0.2",
+    "email-validator>=2.4.0",
+    "fastapi>=0.163.1",
+    "pillow>=13.0.0",
+    "pydantic-settings>=2.16.3",
+    "pymysql>=1.2.4",
+    "sqlalchemy>=2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]

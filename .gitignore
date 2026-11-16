@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Evil Raccoon store
+backend/media/
+
+# 网盘链接（付款后才给用户看），不进 git
+backend/netdisk.json
